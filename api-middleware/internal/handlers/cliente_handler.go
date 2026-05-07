@@ -147,3 +147,50 @@ func esErrorNoEncontrado(err error) bool {
 		strings.Contains(m, "no existe") ||
 		strings.Contains(m, "cannot read world state pair with key")
 }
+
+// ConsultarHistorialCliente obtiene el historial de modificaciones de un cliente.
+func ConsultarHistorialCliente(c *gin.Context) {
+	clienteId := strings.TrimSpace(c.Param("clienteId"))
+	chaincode := strings.TrimSpace(os.Getenv("CHAINCODE_NAME"))
+	if chaincode == "" {
+		c.JSON(http.StatusInternalServerError, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "CONFIGURACION",
+			Mensaje: "No se encontró CHAINCODE_NAME en variables de entorno",
+		})
+		return
+	}
+
+	result, err := fabric.EvaluateTransaction(chaincode, "GetAssetHistory", clienteId)
+	if err != nil {
+		if esErrorNoEncontrado(err) {
+			c.JSON(http.StatusNotFound, models.RespuestaError{
+				Ok:      false,
+				Codigo:  "NO_ENCONTRADO",
+				Mensaje: "Historial no encontrado para el cliente en la Blockchain",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "ERROR_FABRIC",
+			Mensaje: "Error interno al consultar historial del cliente: " + err.Error(),
+		})
+		return
+	}
+
+	var operaciones []models.RegistroHistorialCliente
+	if err := json.Unmarshal(result, &operaciones); err != nil {
+		c.JSON(http.StatusInternalServerError, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "ERROR_FORMATO",
+			Mensaje: "Error al interpretar el historial de la Blockchain",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.HistorialCliente{
+		ClienteId:   clienteId,
+		Operaciones: operaciones,
+	})
+}

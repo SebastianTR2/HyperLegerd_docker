@@ -3,6 +3,7 @@ package chaincode
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
 )
@@ -190,3 +191,57 @@ func (s *SmartContract) GetAllAssets(ctx contractapi.TransactionContextInterface
 
 	return assets, nil
 }
+
+// HistoryQueryResult structure used for returning result of history query
+type HistoryQueryResult struct {
+	Record    *Asset `json:"record"`
+	TxId      string `json:"txId"`
+	Timestamp string `json:"timestamp"`
+	IsDelete  bool   `json:"isDelete"`
+}
+
+// GetAssetHistory returns the chain of custody for an asset since issuance.
+func (s *SmartContract) GetAssetHistory(ctx contractapi.TransactionContextInterface, id string) ([]HistoryQueryResult, error) {
+	resultsIterator, err := ctx.GetStub().GetHistoryForKey(id)
+	if err != nil {
+		return nil, err
+	}
+	defer resultsIterator.Close()
+
+	var records []HistoryQueryResult
+	for resultsIterator.HasNext() {
+		response, err := resultsIterator.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		var asset *Asset
+		if len(response.Value) > 0 {
+			asset = new(Asset)
+			err = json.Unmarshal(response.Value, asset)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			asset = nil
+		}
+
+		timestamp := time.Unix(response.Timestamp.Seconds, int64(response.Timestamp.Nanos)).Format(time.RFC3339)
+
+		record := HistoryQueryResult{
+			TxId:      response.TxId,
+			Timestamp: timestamp,
+			Record:    asset,
+			IsDelete:  response.IsDelete,
+		}
+		records = append(records, record)
+	}
+
+	// Reverse to have descending temporal order (newest first)
+	for i, j := 0, len(records)-1; i < j; i, j = i+1, j-1 {
+		records[i], records[j] = records[j], records[i]
+	}
+
+	return records, nil
+}
+

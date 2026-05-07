@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
 )
@@ -730,4 +731,60 @@ func sub(b int, q int) (int, error) {
 	diff = b - q
 
 	return diff, nil
+}
+
+// HistoryQueryResult structure used for returning result of history query
+type HistoryQueryResult struct {
+	Record    int    `json:"record"`
+	TxId      string `json:"txId"`
+	Timestamp string `json:"timestamp"`
+	IsDelete  bool   `json:"isDelete"`
+}
+
+// GetHistory returns the history of an account balance over time.
+func (s *SmartContract) GetHistory(ctx contractapi.TransactionContextInterface, account string) ([]HistoryQueryResult, error) {
+	// Check if contract has been initialized first
+	initialized, err := checkInitialized(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if !initialized {
+		return nil, fmt.Errorf("Contract options need to be set before calling any function, call Initialize() to initialize contract")
+	}
+
+	resultsIterator, err := ctx.GetStub().GetHistoryForKey(account)
+	if err != nil {
+		return nil, err
+	}
+	defer resultsIterator.Close()
+
+	var records []HistoryQueryResult
+	for resultsIterator.HasNext() {
+		response, err := resultsIterator.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		var balance int
+		if len(response.Value) > 0 {
+			balance, _ = strconv.Atoi(string(response.Value))
+		}
+
+		timestamp := time.Unix(response.Timestamp.Seconds, int64(response.Timestamp.Nanos)).Format(time.RFC3339)
+
+		record := HistoryQueryResult{
+			TxId:      response.TxId,
+			Timestamp: timestamp,
+			Record:    balance,
+			IsDelete:  response.IsDelete,
+		}
+		records = append(records, record)
+	}
+
+	// Reverse to have descending temporal order (newest first)
+	for i, j := 0, len(records)-1; i < j; i, j = i+1, j-1 {
+		records[i], records[j] = records[j], records[i]
+	}
+
+	return records, nil
 }

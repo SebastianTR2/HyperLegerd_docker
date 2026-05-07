@@ -199,7 +199,13 @@ func ConsultarSaldo(c *gin.Context) {
 
 // ConsultarHistorial obtiene la lista de operaciones desde el ledger.
 func ConsultarHistorial(c *gin.Context) {
+	clienteId := strings.TrimSpace(c.Param("clienteId"))
 	codigoToken := strings.TrimSpace(c.Query("codigoToken"))
+	tokenCodeDefault := strings.TrimSpace(os.Getenv("TOKEN_CODE"))
+	if tokenCodeDefault == "" {
+		tokenCodeDefault = "TOK"
+	}
+
 	if codigoToken == "" {
 		c.JSON(http.StatusBadRequest, models.RespuestaError{
 			Ok:      false,
@@ -209,10 +215,74 @@ func ConsultarHistorial(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusNotImplemented, models.RespuestaError{
-		Ok:      false,
-		Codigo:  "NO_IMPLEMENTADO_CHAINCODE",
-		Mensaje: "El chaincode token_erc20 actual no expone una función GetHistory por cuenta. Endpoint reservado para una versión futura.",
+	if !strings.EqualFold(codigoToken, tokenCodeDefault) {
+		c.JSON(http.StatusBadRequest, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "TOKEN_NO_SOPORTADO",
+			Mensaje: fmt.Sprintf("El contrato actual solo soporta codigoToken=%s", tokenCodeDefault),
+		})
+		return
+	}
+
+	chaincode, errResp := tokenChaincodeNombre()
+	if errResp != nil {
+		c.JSON(http.StatusInternalServerError, errResp)
+		return
+	}
+
+	result, err := fabric.EvaluateTransaction(chaincode, "GetHistory", clienteId)
+	if err != nil {
+		if esErrorNoEncontrado(err) {
+			c.JSON(http.StatusNotFound, models.RespuestaError{
+				Ok:      false,
+				Codigo:  "NO_ENCONTRADO",
+				Mensaje: "No existe historial para la cuenta indicada",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "ERROR_FABRIC",
+			Mensaje: "Error al consultar historial del token: " + err.Error(),
+		})
+		return
+	}
+
+	var operacionesRaw []map[string]interface{}
+	if err := json.Unmarshal(result, &operacionesRaw); err != nil {
+		c.JSON(http.StatusInternalServerError, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "ERROR_FORMATO",
+			Mensaje: "Error al interpretar el historial del token devuelto por Blockchain",
+		})
+		return
+	}
+
+	var operaciones []models.OperacionHistorial
+	for _, opRaw := range operacionesRaw {
+		montoInt := int64(0)
+		if r, ok := opRaw["record"].(float64); ok {
+			montoInt = int64(r)
+		}
+		timestamp := ""
+		if t, ok := opRaw["timestamp"].(string); ok {
+			timestamp = t
+		}
+
+		op := models.OperacionHistorial{
+			TxId:        fmt.Sprintf("%v", opRaw["txId"]),
+			Timestamp:   timestamp,
+			Tipo:        "TRANSFERENCIA", // Simplificado por el sample de ERC20
+			Monto:       montoInt,
+			CodigoToken: tokenCodeDefault,
+		}
+		operaciones = append(operaciones, op)
+	}
+
+	c.JSON(http.StatusOK, models.HistorialToken{
+		ClienteId:   clienteId,
+		CodigoToken: tokenCodeDefault,
+		Operaciones: operaciones,
 	})
 }
 

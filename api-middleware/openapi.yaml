@@ -155,6 +155,46 @@ paths:
               schema:
                 $ref: '#/components/schemas/RespuestaError'
 
+  /clientes/historial/{clienteId}:
+    get:
+      security:
+        - ApiKeyAuth: []
+      tags: [clientes]
+      summary: Consultar historial de cambios
+      description: Devuelve el historial de todas las modificaciones de un Asset (cliente).
+      parameters:
+        - name: clienteId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: CLI001
+      responses:
+        '200':
+          description: Historial obtenido correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistorialCliente'
+        '404':
+          description: Cliente o historial no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
   /operar:
     get:
       security:
@@ -905,6 +945,36 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OperacionHistorial'
+
+    RegistroHistorialCliente:
+      type: object
+      required:
+        - txId
+        - timestamp
+        - isDelete
+      properties:
+        txId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        isDelete:
+          type: boolean
+        record:
+          $ref: '#/components/schemas/Cliente'
+
+    HistorialCliente:
+      type: object
+      required:
+        - clienteId
+        - operaciones
+      properties:
+        clienteId:
+          type: string
+        operaciones:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegistroHistorialCliente'
 
     RespuestaExitoTx:
       type: object

@@ -26,6 +26,7 @@ func SetupRoutes(router *gin.Engine) {
 	// Grupo de Clientes
 	router.POST("/clientes", append(authIntegradorOAdmin, handlers.RegistrarCliente)...)
 	router.GET("/clientes/:clienteId", append(authCualquierRol, handlers.ConsultarCliente)...)
+	router.GET("/clientes/historial/:clienteId", append(authCualquierRol, handlers.ConsultarHistorialCliente)...)
 
 	// Grupo de Tokens
 	router.POST("/tokens/emitir", append(authSoloAdmin, handlers.EmitirToken)...)

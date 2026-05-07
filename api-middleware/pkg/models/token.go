@@ -27,6 +27,7 @@ type SaldoToken struct {
 // OperacionHistorial representa una entrada en el historial de transacciones.
 type OperacionHistorial struct {
 	TxId        string `json:"txId"`
+	Timestamp   string `json:"timestamp"`
 	Tipo        string `json:"tipo"`
 	Monto       int64  `json:"monto"`
 	CodigoToken string `json:"codigoToken"`

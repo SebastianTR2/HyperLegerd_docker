@@ -12,3 +12,17 @@ type Cliente struct {
 	Email           string `json:"email,omitempty" binding:"omitempty,email"`
 	Notas           string `json:"notas,omitempty"`
 }
+
+// RegistroHistorialCliente representa un evento histórico del cliente.
+type RegistroHistorialCliente struct {
+	TxId      string   `json:"txId"`
+	Timestamp string   `json:"timestamp"`
+	IsDelete  bool     `json:"isDelete"`
+	Record    *Cliente `json:"record"`
+}
+
+// HistorialCliente representa la lista de operaciones de un cliente.
+type HistorialCliente struct {
+	ClienteId   string                     `json:"clienteId"`
+	Operaciones []RegistroHistorialCliente `json:"operaciones"`
+}

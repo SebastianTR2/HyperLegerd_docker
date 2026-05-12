@@ -16,8 +16,14 @@ info:
     subrayado, máx. 128 caracteres) para reutilizar ese valor como id de operación en bitácora.
 
 servers:
+  # La URL relativa permite que kin-openapi empareje peticiones con cualquier Host (p. ej. 127.0.0.1 vs localhost).
+  # Sin esto, GET http://127.0.0.1:3000/... puede fallar con "no matching operation was found" si solo existe http://localhost:3000.
+  - url: /
+    description: Base relativa — validación OpenAPI compatible con cualquier host/puerto
+  - url: http://127.0.0.1:3000
+    description: Ejemplo local (IP loopback)
   - url: http://localhost:3000
-    description: Servidor local de desarrollo
+    description: Ejemplo local (hostname)
 
 tags:
   - name: clientes
@@ -82,6 +88,34 @@ paths:
                 $ref: '#/components/schemas/RespuestaError'
         '403':
           description: API key inválida o rol sin permiso (solo integrador o admin pueden registrar)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+    get:
+      security:
+        - ApiKeyAuth: []
+      tags: [clientes]
+      summary: Listar clientes registrados
+      description: >-
+        Consulta evaluate GetAllAssets sobre cliente_cc. Cualquier rol con API key válida.
+        El chaincode puede devolver un arreglo JSON, un string JSON, un envoltorio u objeto único;
+        el middleware normaliza a `datos: []` cuando no hay activos.
+      responses:
+        '200':
+          description: Lista de clientes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaLectura'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso
           content:
             application/json:
               schema:
@@ -390,6 +424,241 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RespuestaLectura'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
+  /tokens/cuentas:
+    get:
+      security:
+        - ApiKeyAuth: []
+      tags: [tokens]
+      summary: Listar cuentas token visibles
+      description: Evaluate ListarCuentasToken (alias VTBAL/VTMETA en token_erc20).
+      responses:
+        '200':
+          description: Lista de cuentas visibles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaLectura'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+    post:
+      security:
+        - ApiKeyAuth: []
+      tags: [tokens]
+      summary: Crear cuenta token visible
+      description: Submit CrearCuentaToken. Integrador o admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearCuentaTokenBody'
+      responses:
+        '201':
+          description: Cuenta creada en ledger
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaExitoTx'
+        '400':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: Rol sin permiso (solo integrador o admin)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '409':
+          description: Alias ya registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '500':
+          description: Error de Fabric u otro fallo de ejecución (mensaje detallado en `mensaje`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
+  /tokens/cuentas/emitir:
+    post:
+      security:
+        - ApiKeyAuth: []
+      tags: [tokens]
+      summary: Emitir token a cuenta visible
+      description: Submit EmitirACuentaToken (Mint + transferencia a VTBAL del alias). Solo admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmitirCuentaTokenBody'
+      responses:
+        '200':
+          description: Emisión confirmada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaExitoTx'
+        '400':
+          description: Cuenta inexistente u otro error de negocio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: Solo rol admin para emitir
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
+  /tokens/cuentas/transferir:
+    post:
+      security:
+        - ApiKeyAuth: []
+      tags: [tokens]
+      summary: Transferir entre cuentas visibles
+      description: Submit TransferirEntreCuentasToken. Solo admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferirCuentaTokenBody'
+      responses:
+        '200':
+          description: Transferencia confirmada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaExitoTx'
+        '400':
+          description: Validación o saldo insuficiente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: Solo rol admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
+  /tokens/cuentas/{alias}/saldo:
+    get:
+      security:
+        - ApiKeyAuth: []
+      tags: [tokens]
+      summary: Saldo de cuenta visible
+      parameters:
+        - name: alias
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: codigoToken
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Saldo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaLecturaSaldoToken'
+        '404':
+          description: Cuenta no existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
+  /tokens/cuentas/{alias}:
+    get:
+      security:
+        - ApiKeyAuth: []
+      tags: [tokens]
+      summary: Detalle cuenta visible
+      parameters:
+        - name: alias
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detalle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaLectura'
+        '404':
+          description: No existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
         '401':
           description: Falta la cabecera X-API-Key
           content:
@@ -785,6 +1054,59 @@ components:
         codigoToken:
           type: string
           description: Etiqueta lógica en la API; el chaincode token_erc20 no recibe este parámetro
+          minLength: 1
+
+    CrearCuentaTokenBody:
+      type: object
+      required:
+        - alias
+      properties:
+        alias:
+          type: string
+          description: Nombre corto visible (se normaliza a minúsculas en ledger)
+          minLength: 1
+          example: alex
+
+    EmitirCuentaTokenBody:
+      type: object
+      required:
+        - destinatario
+        - monto
+        - codigoToken
+      properties:
+        destinatario:
+          type: string
+          minLength: 1
+          description: Alias de cuenta visible existente
+        monto:
+          type: integer
+          format: int64
+          minimum: 1
+        codigoToken:
+          type: string
+          minLength: 1
+          example: TOK001
+
+    TransferirCuentaTokenBody:
+      type: object
+      required:
+        - origen
+        - destino
+        - monto
+        - codigoToken
+      properties:
+        origen:
+          type: string
+          minLength: 1
+        destino:
+          type: string
+          minLength: 1
+        monto:
+          type: integer
+          format: int64
+          minimum: 1
+        codigoToken:
+          type: string
           minLength: 1
 
     SaldoToken:

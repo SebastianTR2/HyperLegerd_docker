@@ -60,8 +60,12 @@ func main() {
 	// Auditoría HTTP (hito 2.8): id de operación + bitácora solicitud/resultado (envuelve toda la API)
 	router.Use(middleware.AuditOperaciones())
 
-	// El archivo openapi.yaml está en la carpeta raíz del middleware (api-middleware/)
-	router.Use(middleware.OapiValidator("openapi.yaml"))
+	// Contrato OpenAPI: por defecto api-middleware/openapi.yaml; sobrescribible con OPENAPI_SPEC (ruta absoluta o relativa al cwd).
+	specPath := os.Getenv("OPENAPI_SPEC")
+	if specPath == "" {
+		specPath = "openapi.yaml"
+	}
+	router.Use(middleware.OapiValidator(specPath))
 
 	// 4. Configurar Rutas
 	routes.SetupRoutes(router)

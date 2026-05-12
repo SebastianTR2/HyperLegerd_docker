@@ -1,0 +1,4 @@
+# Contexto mínimo para la imagen parcheada (solo Dockerfile + patch).
+*
+!Dockerfile
+!patch-gateway.mjs

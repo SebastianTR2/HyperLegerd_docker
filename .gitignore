@@ -1,0 +1,56 @@
+# --- Node / frontend ---
+node_modules/
+**/node_modules/
+
+dist/
+**/dist/
+
+.vite/
+**/.vite/
+
+# --- Variables de entorno (mantener plantillas) ---
+.env
+/.env
+!.env.example
+!/.env.example
+!**/.env.example
+
+# --- Logs ---
+*.log
+logs/
+**/logs/
+
+# --- Paquetes / backups ---
+*.tar.gz
+*.tgz
+
+# --- Hyperledger / Explorer: datos locales ---
+wallet/
+**/wallet/
+
+explorerdb/
+**/explorerdb/
+
+# Organizaciones Fabric: NO ignorar organizations/ completo (hay scripts y plantillas versionados).
+# Solo artefactos generados (crypto, peers, orderers):
+**/organizations/ordererOrganizations/
+**/organizations/peerOrganizations/
+**/organizations/fabric-ca/ordererOrg/
+**/organizations/fabric-ca/org1/
+**/organizations/fabric-ca/org2/
+**/addOrg3/fabric-ca/org3/
+
+system-genesis-block/
+**/system-genesis-block/
+
+channel-artifacts/
+**/channel-artifacts/
+
+# --- Claves privadas ---
+*_sk
+**/*_sk
+priv_sk
+**/priv_sk
+
+# --- SO ---
+.DS_Store

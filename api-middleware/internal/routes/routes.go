@@ -24,8 +24,17 @@ func SetupRoutes(router *gin.Engine) {
 	}
 
 	// Grupo de Clientes
+	router.GET("/clientes", append(authCualquierRol, handlers.ListarClientes)...)
 	router.POST("/clientes", append(authIntegradorOAdmin, handlers.RegistrarCliente)...)
 	router.GET("/clientes/:clienteId", append(authCualquierRol, handlers.ConsultarCliente)...)
+
+	// Cuentas token visibles (Fase 2): rutas literales antes que :alias
+	router.GET("/tokens/cuentas", append(authCualquierRol, handlers.ListarCuentasToken)...)
+	router.POST("/tokens/cuentas", append(authIntegradorOAdmin, handlers.CrearCuentaTokenVisible)...)
+	router.POST("/tokens/cuentas/emitir", append(authSoloAdmin, handlers.EmitirACuentaTokenVisible)...)
+	router.POST("/tokens/cuentas/transferir", append(authSoloAdmin, handlers.TransferirEntreCuentasTokenVisible)...)
+	router.GET("/tokens/cuentas/:alias/saldo", append(authCualquierRol, handlers.ConsultarSaldoCuentaTokenVisible)...)
+	router.GET("/tokens/cuentas/:alias", append(authCualquierRol, handlers.ObtenerCuentaTokenVisible)...)
 
 	// Grupo de Tokens
 	router.POST("/tokens/emitir", append(authSoloAdmin, handlers.EmitirToken)...)

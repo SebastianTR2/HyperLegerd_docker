@@ -98,17 +98,61 @@ func TransferirToken(c *gin.Context) {
 		return
 	}
 
-	transRes, err := fabric.InvokeTransactionWithTxID(
-		chaincode,
-		"Transfer",
-		strings.TrimSpace(s.Destino),
-		fmt.Sprintf("%d", s.Monto),
-	)
+	origen := strings.TrimSpace(s.Origen)
+	destino := strings.TrimSpace(s.Destino)
+
+	// Regla de negocio del token_erc20: Transfer usa como origen la identidad firmante del gateway.
+	// Si el origen enviado no coincide con esa cuenta, la transacción fallará por fondos/autorización.
+	cuentaFirmante, err := obtenerCuentaFirmanteToken(chaincode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.RespuestaError{
 			Ok:      false,
 			Codigo:  "ERROR_FABRIC",
-			Mensaje: "Error al transferir tokens: " + err.Error(),
+			Mensaje: "No se pudo resolver la cuenta firmante del gateway para transferir tokens: " + err.Error(),
+		})
+		return
+	}
+	if origen != cuentaFirmante {
+		c.JSON(http.StatusBadRequest, models.RespuestaError{
+			Ok:     false,
+			Codigo: "ORIGEN_NO_FIRMANTE",
+			Mensaje: "En token_erc20 el origen real es la identidad firmante del gateway. " +
+				"Use como origen la cuenta del gateway (ClientAccountID) o utilice otra operación de negocio.",
+		})
+		return
+	}
+	if destino == cuentaFirmante {
+		c.JSON(http.StatusBadRequest, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "DESTINO_INVALIDO",
+			Mensaje: "El destino no puede ser la misma cuenta firmante/origen en una transferencia ERC-20",
+		})
+		return
+	}
+
+	transRes, err := fabric.InvokeTransactionWithTxID(
+		chaincode,
+		"Transfer",
+		destino,
+		fmt.Sprintf("%d", s.Monto),
+	)
+	if err != nil {
+		msg := err.Error()
+		msgLower := strings.ToLower(msg)
+		if strings.Contains(msgLower, "insufficient funds") ||
+			strings.Contains(msgLower, "cannot transfer to and from same client account") ||
+			strings.Contains(msgLower, "has no balance") {
+			c.JSON(http.StatusBadRequest, models.RespuestaError{
+				Ok:      false,
+				Codigo:  "TRANSFERENCIA_INVALIDA",
+				Mensaje: "Transferencia no válida para token_erc20: " + msg,
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "ERROR_FABRIC",
+			Mensaje: "Error al transferir tokens: " + msg,
 		})
 		return
 	}
@@ -256,4 +300,21 @@ func validarTransferirToken(s models.TransferirToken) error {
 		return fmt.Errorf("origen es obligatorio en la solicitud (informativo; el ledger usa la identidad del gateway)")
 	}
 	return nil
+}
+
+func obtenerCuentaFirmanteToken(chaincode string) (string, error) {
+	raw, err := fabric.EvaluateTransaction(chaincode, "ClientAccountID")
+	if err != nil {
+		return "", err
+	}
+	return normalizarTextoFabric(raw), nil
+}
+
+func normalizarTextoFabric(raw []byte) string {
+	texto := strings.TrimSpace(string(raw))
+	var quoted string
+	if err := json.Unmarshal(raw, &quoted); err == nil {
+		return strings.TrimSpace(quoted)
+	}
+	return strings.Trim(texto, "\"")
 }

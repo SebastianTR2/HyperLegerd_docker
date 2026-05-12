@@ -3,6 +3,9 @@ package middleware
 import (
 	"api-middleware/pkg/models"
 	"context"
+	"log"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -11,13 +14,51 @@ import (
 	ginmiddleware "github.com/oapi-codegen/gin-middleware"
 )
 
+func logOpenAPILoaded(doc *openapi3.T, absSpec string) {
+	type opLine struct {
+		method, path string
+	}
+	var lines []opLine
+	for urlPath, item := range doc.Paths.Map() {
+		if item == nil {
+			continue
+		}
+		for method := range item.Operations() {
+			u := strings.ToUpper(strings.TrimSpace(method))
+			if u == "" {
+				continue
+			}
+			lines = append(lines, opLine{method: u, path: urlPath})
+		}
+	}
+	sort.Slice(lines, func(i, j int) bool {
+		if lines[i].path != lines[j].path {
+			return lines[i].path < lines[j].path
+		}
+		return lines[i].method < lines[j].method
+	})
+	log.Printf("[OpenAPI] especificación cargada (absoluto): %s", absSpec)
+	log.Printf("[OpenAPI] operaciones (%d):", len(lines))
+	for _, l := range lines {
+		log.Printf("[OpenAPI]   %s %s", l.method, l.path)
+	}
+}
+
 // OapiValidator configura el middleware que valida las peticiones contra el openapi.yaml.
 func OapiValidator(specPath string) gin.HandlerFunc {
-	// 1. Cargar el esquema OpenAPI
-	swagger, err := openapi3.NewLoader().LoadFromFile(specPath)
+	absSpec, err := filepath.Abs(specPath)
 	if err != nil {
-		panic("Error al cargar openapi.yaml: " + err.Error())
+		panic("OpenAPI: no se pudo resolver la ruta del spec: " + err.Error())
 	}
+	// 1. Cargar el esquema OpenAPI
+	swagger, err := openapi3.NewLoader().LoadFromFile(absSpec)
+	if err != nil {
+		panic("Error al cargar openapi.yaml (" + absSpec + "): " + err.Error())
+	}
+	if err := swagger.Validate(context.Background()); err != nil {
+		panic("OpenAPI: validación del documento falló (" + absSpec + "): " + err.Error())
+	}
+	logOpenAPILoaded(swagger, absSpec)
 
 	// 2. Definir opciones personalizadas para el validador
 	options := &ginmiddleware.Options{

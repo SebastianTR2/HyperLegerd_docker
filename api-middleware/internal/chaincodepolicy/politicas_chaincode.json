@@ -69,6 +69,41 @@
       "funcion": "Allowance",
       "modos": ["evaluate"],
       "numeroArgumentos": 2
+    },
+    {
+      "canal": "clientes",
+      "contrato": "token_erc20",
+      "funcion": "ListarCuentasToken",
+      "modos": ["evaluate"],
+      "numeroArgumentos": 0
+    },
+    {
+      "canal": "clientes",
+      "contrato": "token_erc20",
+      "funcion": "ObtenerCuentaToken",
+      "modos": ["evaluate"],
+      "numeroArgumentos": 1
+    },
+    {
+      "canal": "clientes",
+      "contrato": "token_erc20",
+      "funcion": "ConsultarSaldoCuentaToken",
+      "modos": ["evaluate"],
+      "numeroArgumentos": 1
+    },
+    {
+      "canal": "clientes",
+      "contrato": "token_erc20",
+      "funcion": "CuentaTokenExiste",
+      "modos": ["evaluate"],
+      "numeroArgumentos": 1
+    },
+    {
+      "canal": "clientes",
+      "contrato": "token_erc20",
+      "funcion": "CrearCuentaToken",
+      "modos": ["submit"],
+      "numeroArgumentos": 1
     }
   ],
   "administracion": [
@@ -148,6 +183,27 @@
       "funcion": "Initialize",
       "modos": ["submit"],
       "numeroArgumentos": 3
+    },
+    {
+      "canal": "clientes",
+      "contrato": "token_erc20",
+      "funcion": "CrearCuentaToken",
+      "modos": ["submit"],
+      "numeroArgumentos": 1
+    },
+    {
+      "canal": "clientes",
+      "contrato": "token_erc20",
+      "funcion": "EmitirACuentaToken",
+      "modos": ["submit"],
+      "numeroArgumentos": 3
+    },
+    {
+      "canal": "clientes",
+      "contrato": "token_erc20",
+      "funcion": "TransferirEntreCuentasToken",
+      "modos": ["submit"],
+      "numeroArgumentos": 4
     }
   ]
 }

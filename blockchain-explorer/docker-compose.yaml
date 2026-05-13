@@ -31,8 +31,14 @@ services:
     networks:
       - fabric
 
+  # DISCOVERY_AS_LOCALHOST=false: Explorer en Docker debe resolver peers por hostname (peer0.org1.example.com), no localhost.
   explorer.clientes:
-    image: ghcr.io/hyperledger-labs/explorer:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: explorer-clientes:patched
+    # Reconstruye la imagen con patch-gateway.mjs al hacer `up` (evita quedarse con una imagen vieja sin parche).
+    pull_policy: build
     container_name: explorer.clientes
     hostname: explorer.clientes
     environment:

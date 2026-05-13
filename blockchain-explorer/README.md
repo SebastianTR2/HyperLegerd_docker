@@ -12,6 +12,10 @@ docker network ls | grep fabric_test
 
 Explorer debe usar **esa misma red** (`external: true` en `docker-compose.yaml`) para resolver `peer0.org1.example.com` y demás hostnames internos.
 
+El perfil de conexión usa la identidad **`Admin@org1.example.com`** (MSP **Org1MSP**) para el canal **`clientes`**.
+
+La imagen de Explorer se **construye desde este directorio** (`Dockerfile` + `patch-gateway.mjs`): se desactiva el discovery del Gateway y se evita la llamada al DiscoveryService del peer que en algunos despliegues devuelve *access denied* (políticas / OUs). Los nodos peer/orderer que ve la base de datos de Explorer se rellenan con la topología estática del test-network (`peer0.org1.example.com:7051`, `orderer.example.com:7050`). Las consultas a ledger (bloques, qscc, etc.) siguen yendo al peer por TLS con los certificados del connection profile.
+
 ## Prerrequisitos
 
 - Docker Desktop.
@@ -22,7 +26,7 @@ cd red-hyperledger/test-network
 ./network.sh up createChannel -ca -s couchdb -c clientes
 ```
 
-- Con **Fabric CA**, la clave privada de `User1` está en `keystore/` con un nombre `*_sk`, no `priv_sk`. Antes de arrancar Explorer, ejecuta:
+- Con **Fabric CA**, la clave privada de `Admin@org1.example.com` puede estar en `keystore/` solo como `*_sk`, no `priv_sk`. Antes de arrancar Explorer, ejecuta:
 
 ```bash
 cd blockchain-explorer
@@ -31,6 +35,19 @@ chmod +x prep-explorer-msp.sh
 ```
 
 (O define `FABRIC_TEST_NETWORK_ROOT` si tu `test-network` no está en `../red-hyperledger/test-network` respecto a esta carpeta.)
+
+**Importante (causa habitual de *access denied* y de la pantalla genérica de error):** Explorer guarda en un volumen Docker la identidad Fabric bajo la etiqueta `client.adminCredential.id`. Si cambiaste el connection profile a **Admin@org1** pero el volumen de **wallet** sigue teniendo la identidad antigua (p. ej. User1), **no vuelve a leer los PEM del disco**. Solución: bajar los contenedores **borrando volúmenes** una vez y volver a subir:
+
+```bash
+docker compose --env-file .env down -v
+./prep-explorer-msp.sh
+docker compose --env-file .env build
+docker compose --env-file .env up -d
+```
+
+En Windows, `prep-explorer-msp.sh` copia (no enlaza) `priv_sk` para que el bind mount sea fiable dentro del contenedor.
+
+Si tras enroll el certificado de Admin no se llama `cert.pem`, renómbralo o ajusta en `clientes-network.json` la ruta en `signedCert.path` (por ejemplo `Admin@org1.example.com-cert.pem`).
 
 ## Variables de entorno
 
@@ -50,8 +67,19 @@ Desde **esta carpeta** (`proyecto-blockchain/blockchain-explorer/`):
 ```bash
 cp -n .env.example .env   # o crea .env a mano
 ./prep-explorer-msp.sh
+docker compose --env-file .env build
 docker compose --env-file .env up -d
 ```
+
+Tras cambiar `patch-gateway.mjs` o el `Dockerfile`, vuelve a ejecutar `docker compose --env-file .env build` (o `up --build`). El servicio `explorer.clientes` tiene `pull_policy: build` para reconstruir al hacer `up` (si tu Compose es antiguo y falla, quita esa línea y usa solo `up --build -d`).
+
+## Si “antes sí y ahora no”
+
+1. **Imagen sin parche**: sin `build`, a veces sigues con una imagen vieja. Prueba `docker compose --env-file .env build --no-cache` y luego `up -d`.
+2. **`.env` y `FABRIC_CRYPTO_PATH`**: debe apuntar a la carpeta **`organizations`** del test-network (donde están `peerOrganizations/...`). Si está mal, faltan certificados dentro del contenedor.
+3. **`cert.pem`**: si Admin solo tiene otro `.pem` en `signcerts`, ajusta `signedCert.path` en `clientes-network.json`.
+4. **Red `fabric_test`**: Fabric y Explorer deben compartir esa red Docker.
+5. **Login**: red `clientes-network`, usuario `exploreradminclientes`, contraseña `exploreradminpw`.
 
 Ver logs si la UI no carga el canal:
 
@@ -63,9 +91,11 @@ docker logs explorer.clientes 2>&1 | tail -80
 
 - URL: **http://localhost:8081** (o el `PORT` que hayas puesto en `.env`).
 - En el login de Explorer, el campo de red debe coincidir con el id del perfil: **`clientes-network`**.
-- Usuario / contraseña (definidos en `connection-profile/clientes-network.json` → `client.adminCredential`):
-  - **Usuario:** `exploreradmin`
+- Usuario / contraseña (definidos en `connection-profile/clientes-network.json` → `client.adminCredential`; son credenciales **de la aplicación Explorer**, distintas del usuario Fabric):
+  - **Usuario:** `exploreradminclientes`
   - **Contraseña:** `exploreradminpw`
+
+(Ese usuario fuerza una **nueva** entrada en la wallet con los certificados actuales de Admin; evita quedarse con una identidad vieja cacheada bajo el antiguo `exploreradmin`.)
 
 ## Validar evidencia visual (entregable 1.5)
 

@@ -69,6 +69,46 @@ func RegistrarCliente(c *gin.Context) {
 	})
 }
 
+// ListarClientes devuelve todos los assets cliente_cc (GetAllAssets).
+func ListarClientes(c *gin.Context) {
+	chaincode := strings.TrimSpace(os.Getenv("CHAINCODE_NAME"))
+	if chaincode == "" {
+		c.JSON(http.StatusInternalServerError, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "CONFIGURACION",
+			Mensaje: "No se encontró CHAINCODE_NAME en variables de entorno",
+		})
+		return
+	}
+	raw, err := fabric.EvaluateTransaction(chaincode, "GetAllAssets")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "ERROR_FABRIC",
+			Mensaje: "Error al listar clientes: " + err.Error(),
+		})
+		return
+	}
+	clientes, err := decodeListaClientes(raw)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "ERROR_FORMATO",
+			Mensaje: "No se pudo interpretar la lista: " + err.Error(),
+		})
+		return
+	}
+	if clientes == nil {
+		clientes = []models.Cliente{}
+	}
+	c.JSON(http.StatusOK, models.RespuestaLectura{
+		Ok:      true,
+		Codigo:  "CONSULTA_EXITOSA",
+		Mensaje: "Listado de clientes registrados",
+		Datos:   clientes,
+	})
+}
+
 // ConsultarCliente obtiene los datos de un cliente desde el ledger.
 func ConsultarCliente(c *gin.Context) {
 	clienteId := strings.TrimSpace(c.Param("clienteId"))

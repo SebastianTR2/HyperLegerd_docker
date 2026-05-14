@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useDemoStore } from '../context/DemoStoreContext'
 import { useSettings } from '../context/SettingsContext'
-import { clienteApiToRegistro, parseClienteDatos } from '../lib/apiClienteAdapter'
+import { clienteApiToRegistro, parseClienteDesdeLectura } from '../lib/apiClienteAdapter'
 import { describeApiError } from '../lib/apiErrorMessage'
 import { consultarClienteApi } from '../services/apiClientes'
 import { ApiHttpError } from '../services/apiClient'
@@ -16,11 +17,18 @@ const btnPrimary =
   'inline-flex items-center justify-center rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-slate-100 shadow-sm transition-colors hover:bg-accent-hover'
 
 export default function ConsultasPage() {
+  const location = useLocation()
   const { mode, role, roleLabel } = useSettings()
   const { mergeExternalEvent, upsertApiClienteRow, showToast, pushTrace, refreshClientesLedger } = useDemoStore()
   const [clienteIdApi, setClienteIdApi] = useState('')
   const [lastApiRow, setLastApiRow] = useState<ClienteApiCacheRow | null>(null)
   const [lastError, setLastError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const st = location.state as { clienteId?: string } | null | undefined
+    const id = typeof st?.clienteId === 'string' ? st.clienteId.trim() : ''
+    if (id) setClienteIdApi(id)
+  }, [location.state])
 
   const onSubmitApi = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,7 +41,7 @@ export default function ConsultasPage() {
     }
     try {
       const res = await consultarClienteApi(id)
-      const parsed = parseClienteDatos(res.datos)
+      const parsed = parseClienteDesdeLectura(res)
       if (parsed) {
         upsertApiClienteRow(parsed)
         setLastApiRow(parsed)

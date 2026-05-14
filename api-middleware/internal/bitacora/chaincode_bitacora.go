@@ -86,7 +86,9 @@ func escribirEnBitacora(v interface{}, prefijo string) {
 		return
 	}
 	log.Printf("%s %s", prefijo, string(line))
-	
+
+	RegistrarLineaAuditoriaMemoria(prefijo, line)
+
 	bitacoraMu.Lock()
 	defer bitacoraMu.Unlock()
 	if bitacoraFH != nil {

@@ -45,7 +45,11 @@ export default function HistorialPage() {
         items={filtrados}
         title="Historial de operaciones"
         subtitle={`${filtrados.length} operación(es) con el filtro actual`}
-        emptyText="No hay operaciones con este filtro."
+        emptyText={
+          eventos.length === 0 && tipo === 'all'
+            ? 'No hay operaciones registradas.'
+            : 'No hay operaciones con este filtro.'
+        }
         showHistorialLink={false}
         className="min-h-0 flex-1"
       />

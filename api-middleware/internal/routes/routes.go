@@ -27,6 +27,8 @@ func SetupRoutes(router *gin.Engine) {
 	router.GET("/clientes", append(authCualquierRol, handlers.ListarClientes)...)
 	router.POST("/clientes", append(authIntegradorOAdmin, handlers.RegistrarCliente)...)
 	router.GET("/clientes/:clienteId", append(authCualquierRol, handlers.ConsultarCliente)...)
+	router.PATCH("/clientes/:clienteId", append(authIntegradorOAdmin, handlers.ActualizarCliente)...)
+	router.POST("/clientes/:clienteId/baja", append(authIntegradorOAdmin, handlers.DarBajaCliente)...)
 	router.GET("/clientes/historial/:clienteId", append(authCualquierRol, handlers.ConsultarHistorialCliente)...)
 
 	// Cuentas token visibles (Fase 2): rutas literales antes que :alias

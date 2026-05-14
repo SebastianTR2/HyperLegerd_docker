@@ -17,7 +17,7 @@ type NavItem = {
 
 const items: NavItem[] = [
   { to: '/', label: 'Panel', icon: IconGrid, end: true },
-  { to: '/registros', label: 'Registros', icon: IconUsers },
+  { to: '/registros', label: 'Registros del sistema', icon: IconUsers },
   { to: '/tokens', label: 'Tokens', icon: IconCoin },
   { to: '/cuentas-visibles', label: 'Cuentas token visibles', icon: IconEye },
   { to: '/consultas', label: 'Consultas', icon: IconSearch },

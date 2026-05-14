@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useDemoStore } from '../context/DemoStoreContext'
 import { useSettings } from '../context/SettingsContext'
 import { rolePermissions, workspaceLabel } from '../lib/roles'
-import { normalizeApiKey } from '../lib/settings'
+import { normalizeApiKey, STORAGE_KEY_API_KEY } from '../lib/settings'
 
 const presets = [
   {
@@ -47,7 +47,7 @@ function activationMessage(roleName: string): string {
 
 export default function CredencialesPage() {
   const { mode, apiKey, role, roleLabel, setMode, setApiKey } = useSettings()
-  const { showToast } = useDemoStore()
+  const { showToast, refreshClientesLedger } = useDemoStore()
   const [draftKey, setDraftKey] = useState(apiKey)
 
   const activePresetValue = useMemo(() => presetByValue(apiKey)?.value ?? null, [apiKey])
@@ -72,6 +72,13 @@ export default function CredencialesPage() {
     setDraftKey(value)
     setApiKey(value)
     if (hit) showToast(activationMessage(hit.role), 'success')
+  }
+
+  const clearStoredCredential = () => {
+    setApiKey('')
+    setDraftKey('')
+    void refreshClientesLedger()
+    showToast('Credencial eliminada del navegador. Guarde una clave válida para operar con el servicio.', 'info')
   }
 
   return (
@@ -220,6 +227,19 @@ export default function CredencialesPage() {
         >
           Guardar API key
         </button>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-xl border border-line bg-surface/70 px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-elevated"
+            onClick={clearStoredCredential}
+          >
+            Quitar credencial del navegador
+          </button>
+        </div>
+        <p className="mt-3 text-[11px] text-muted">
+          Si la clave quedó corrupta o desactualizada, use &quot;Quitar credencial&quot; y vuelva a guardar. La entrada
+          en almacenamiento es <code className="font-mono text-slate-400">{STORAGE_KEY_API_KEY}</code>.
+        </p>
         {apiKey ? (
           <p className="mt-2 text-[11px] text-muted">
             Activa: <span className="font-mono text-slate-400">{apiKey.slice(0, 4)}…{apiKey.slice(-2)}</span> ·{' '}

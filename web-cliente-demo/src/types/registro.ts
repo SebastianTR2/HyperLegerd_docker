@@ -1,4 +1,4 @@
-export type EstadoRegistro = 'activo' | 'inactivo' | 'pendiente'
+export type EstadoRegistro = 'activo' | 'inactivo' | 'pendiente' | 'baja'
 
 export interface Registro {
   id: string

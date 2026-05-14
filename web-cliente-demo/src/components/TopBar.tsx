@@ -13,8 +13,16 @@ const SECTION_META: Record<string, { title: string; subtitle: string }> = {
     subtitle: 'Resumen, accesos rápidos y actividad reciente',
   },
   '/registros': {
-    title: 'Registros',
-    subtitle: 'Alta de cliente y respuesta del servidor',
+    title: 'Registros del sistema',
+    subtitle: 'Portal operativo, resumen en red y enlaces de auditoría',
+  },
+  '/clientes-registrados': {
+    title: 'Clientes registrados',
+    subtitle: 'Listado desde GET /clientes',
+  },
+  '/cuentas-visibles': {
+    title: 'Cuentas token visibles',
+    subtitle: 'Estado en ledger',
   },
   '/tokens': {
     title: 'Cuentas token',

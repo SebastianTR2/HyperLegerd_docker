@@ -1,0 +1,179 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Tokens CSS (portal claro). Sincronizados con la paleta pedida.
+ */
+:root {
+  color-scheme: light;
+  --pc-canvas: #f8f6f2;
+  --pc-surface: #ffffff;
+  --pc-surface-muted: #f5f2ec;
+  --pc-line: #e8e1d8;
+  --pc-muted: #6b7280;
+  --pc-ink: #1f2937;
+  --pc-ink-secondary: #374151;
+  --pc-brand: #d97706;
+  --pc-brand-hover: #c96e0a;
+  --pc-brand-soft: #fff1e6;
+}
+
+@layer base {
+  html {
+    height: 100%;
+    color-scheme: light;
+  }
+  body {
+    min-height: 100%;
+    margin: 0;
+    background-color: var(--pc-canvas);
+    color: var(--pc-ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  #root {
+    min-height: 100%;
+    background-color: var(--pc-canvas);
+    color: var(--pc-ink);
+  }
+}
+
+/*
+ * Overrides finales: tema claro obligatorio dentro de #root .portal-app.
+ * Cubre extensiones / auto-dark / CSS global que re pinten fondos o botones.
+ * (Sin tocar lógica React — solo presentación.)
+ */
+#root .portal-app {
+  background-color: #f8f6f2 !important;
+  color: #1f2937 !important;
+}
+
+#root .portal-app aside {
+  background-color: #ffffff !important;
+  color: #1f2937 !important;
+  border-color: #e8e1d8 !important;
+}
+
+#root .portal-app .portal-topnav {
+  background-color: #ffffff !important;
+  border-color: #e8e1d8 !important;
+}
+
+#root .portal-app header {
+  background-color: #ffffff !important;
+  color: #1f2937 !important;
+  border-color: #e8e1d8 !important;
+}
+
+#root .portal-app main {
+  background-color: #f8f6f2 !important;
+  color: #1f2937 !important;
+}
+
+#root .portal-app footer {
+  background-color: #ffffff !important;
+  color: #6b7280 !important;
+  border-color: #e8e1d8 !important;
+}
+
+#root .portal-app main section {
+  background-color: #ffffff !important;
+  color: #1f2937 !important;
+  border-color: #e8e1d8 !important;
+}
+
+#root .portal-app main section > div.border-b {
+  background-color: rgba(245, 242, 236, 0.65) !important;
+  border-color: rgba(232, 225, 216, 0.85) !important;
+  color: #1f2937 !important;
+}
+
+#root .portal-app aside nav a,
+#root .portal-app .portal-topnav a {
+  color: #374151 !important;
+}
+
+#root .portal-app aside nav a[aria-current='page'],
+#root .portal-app .portal-topnav a[aria-current='page'] {
+  background-color: #fff1e6 !important;
+  color: #d97706 !important;
+  border-color: transparent !important;
+}
+
+#root .portal-app button.portal-btn-primary,
+#root .portal-app header button[type='submit'] {
+  background-color: #d97706 !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+}
+
+#root .portal-app button.portal-btn-primary:hover:not(:disabled),
+#root .portal-app header button[type='submit']:hover:not(:disabled) {
+  background-color: #c96e0a !important;
+}
+
+#root .portal-app button.portal-btn-secondary {
+  background-color: #ffffff !important;
+  color: #1f2937 !important;
+  border: 1px solid #e8e1d8 !important;
+}
+
+#root .portal-app button.portal-btn-secondary:hover:not(:disabled) {
+  background-color: rgba(255, 241, 230, 0.55) !important;
+  border-color: rgba(217, 119, 6, 0.35) !important;
+}
+
+#root .portal-app button.portal-btn-danger {
+  background-color: #ffffff !important;
+  color: #991b1b !important;
+  border: 1px solid #fecaca !important;
+}
+
+#root .portal-app button.portal-btn-danger:hover:not(:disabled) {
+  background-color: #fee2e2 !important;
+}
+
+#root .portal-app button.portal-btn-ghost:hover:not(:disabled) {
+  background-color: #f5f2ec !important;
+}
+
+#root .portal-app input.portal-field,
+#root .portal-app textarea.portal-field,
+#root .portal-app select.portal-field {
+  background-color: #ffffff !important;
+  color: #1f2937 !important;
+  border-color: #e8e1d8 !important;
+}
+
+#root .portal-app main table a {
+  color: #d97706 !important;
+}
+
+#root .portal-app .portal-link {
+  color: #d97706 !important;
+}
+
+#root .portal-app .portal-badge-success {
+  background-color: #f0fdf4 !important;
+  color: #166534 !important;
+  border-color: #bbf7d0 !important;
+}
+
+#root .portal-app .portal-badge-danger {
+  background-color: #fef2f2 !important;
+  color: #991b1b !important;
+  border-color: #fecaca !important;
+}
+
+#root .portal-app .portal-badge-warn {
+  background-color: #fffbeb !important;
+  color: #92400e !important;
+  border-color: #fde68a !important;
+}
+
+#root .portal-app .portal-badge-neutral {
+  background-color: #f5f2ec !important;
+  color: #374151 !important;
+  border-color: #e8e1d8 !important;
+}

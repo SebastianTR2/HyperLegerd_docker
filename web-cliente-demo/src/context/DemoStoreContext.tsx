@@ -15,7 +15,7 @@ import {
   randomHexRef,
   saveDemoState,
 } from '../lib/demoPersist'
-import { describeApiError } from '../lib/apiErrorMessage'
+import { describeApiError, isCredentialHttpError } from '../lib/apiErrorMessage'
 import { loadApiClientesCache, saveApiClientesCache, upsertApiClienteCache as upsertApiClienteInList } from '../lib/apiClientesCache'
 import { loadTraceEntries, saveTraceEntries } from '../lib/tracePersist'
 import { listarClientesApi } from '../services/apiClientesLista'
@@ -59,6 +59,8 @@ interface DemoStoreValue {
   clientesLedger: ClienteApi[]
   clientesLedgerLoading: boolean
   clientesLedgerError: string | null
+  /** True cuando el fallo de GET /clientes es 401/403 (evita repetir el mismo aviso en rojo en toda la UI). */
+  clientesLedgerAccessDenied: boolean
   refreshClientesLedger: () => Promise<void>
   /** Clientes vistos o dados de alta vía API (persistido aparte del mock demo). */
   apiClienteRows: ClienteApiCacheRow[]
@@ -118,18 +120,21 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
   const [clientesLedger, setClientesLedger] = useState<ClienteApi[]>([])
   const [clientesLedgerLoading, setClientesLedgerLoading] = useState(false)
   const [clientesLedgerError, setClientesLedgerError] = useState<string | null>(null)
+  const [clientesLedgerAccessDenied, setClientesLedgerAccessDenied] = useState(false)
   const [traces, setTraces] = useState<TraceEntry[]>(() => loadTraceEntries())
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
   const refreshClientesLedger = useCallback(async () => {
     setClientesLedgerLoading(true)
     setClientesLedgerError(null)
+    setClientesLedgerAccessDenied(false)
     try {
       const list = await listarClientesApi()
       setClientesLedger(list)
     } catch (e) {
       setClientesLedger([])
       setClientesLedgerError(describeApiError(e))
+      setClientesLedgerAccessDenied(isCredentialHttpError(e))
     } finally {
       setClientesLedgerLoading(false)
     }
@@ -392,6 +397,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       clientesLedger,
       clientesLedgerLoading,
       clientesLedgerError,
+      clientesLedgerAccessDenied,
       refreshClientesLedger,
       apiClienteRows,
       upsertApiClienteRow,
@@ -416,6 +422,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       clientesLedger,
       clientesLedgerLoading,
       clientesLedgerError,
+      clientesLedgerAccessDenied,
       refreshClientesLedger,
       apiClienteRows,
       upsertApiClienteRow,

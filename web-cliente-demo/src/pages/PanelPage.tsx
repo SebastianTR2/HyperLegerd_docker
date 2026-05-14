@@ -3,23 +3,26 @@ import { ActivityFeed } from '../components/ActivityFeed'
 import { StatSummary } from '../components/StatSummary'
 import { useDemoStore } from '../context/DemoStoreContext'
 import { useSettings } from '../context/SettingsContext'
-import { workspaceLabel } from '../lib/roles'
 import { formatShortDate } from '../lib/format'
+import { getPortalClienteUrl } from '../lib/portalCliente'
+import { workspaceLabel } from '../lib/roles'
 import type { ClienteApi } from '../types/api'
+import { ClienteLedgerEstadoBadge } from '../components/ClienteLedgerEstadoBadge'
 
 const shortcutsBase = [
-  { to: '/registros', label: 'Registros', desc: 'Alta de cliente y respuesta del servidor' },
-  { to: '/tokens', label: 'Cuentas token', desc: 'Emitir y transferir vía API' },
-  { to: '/cuentas-visibles', label: 'Cuentas token visibles', desc: 'Listado desde chaincode' },
-  { to: '/consultas', label: 'Consultas', desc: 'Buscar por clienteId exacto' },
-  { to: '/clientes-registrados', label: 'Clientes registrados', desc: 'GET /clientes' },
-  { to: '/historial', label: 'Historial de operaciones', desc: 'Auditoría de la sesión' },
-  { to: '/trazabilidad', label: 'Trazabilidad', desc: 'TXID y pasos' },
-  { to: '/credenciales', label: 'Credenciales', desc: 'Rol y cabecera X-API-Key' },
+  { to: '/clientes-registrados', label: 'Ver clientes registrados', desc: 'Listado desde GET /clientes' },
+  { to: '/historial', label: 'Revisar actividad', desc: 'Operaciones registradas en esta sesión' },
+  { to: '/trazabilidad', label: 'Auditar operaciones', desc: 'Trazas y comprobación técnica' },
+  { to: '/cuentas-visibles', label: 'Ver cuentas token visibles', desc: 'Estado en ledger' },
+  { to: '/tokens', label: 'Operaciones con tokens', desc: 'Emisión y transferencia vía API' },
+  { to: '/consultas', label: 'Consultas', desc: 'Cliente por clienteId exacto' },
+  { to: '/registros', label: 'Registros del sistema', desc: 'Portal operativo y resumen en red' },
+  { to: '/credenciales', label: 'Credenciales', desc: 'Rol y clave de acceso' },
 ] as const
 
 export default function PanelPage() {
-  const { eventos, tokenOps, clientesLedger, clientesLedgerLoading, clientesLedgerError } = useDemoStore()
+  const { eventos, tokenOps, clientesLedger, clientesLedgerLoading, clientesLedgerError, clientesLedgerAccessDenied } =
+    useDemoStore()
   const { mode, role, roleLabel, permissions } = useSettings()
   const consultasCount = eventos.filter((e) => e.tipo === 'consulta').length
   const ultimos = [...clientesLedger].sort(
@@ -28,9 +31,9 @@ export default function PanelPage() {
   const actividad = eventos.slice(0, 8)
   const shortcuts = shortcutsBase.filter((s) => {
     if (s.to === '/tokens' && !permissions.canEmitTokens) return false
-    if (s.to === '/registros' && !permissions.canRegisterClients) return false
     return true
   })
+  const portalClienteUrl = getPortalClienteUrl()
   const workspace = workspaceLabel(role)
   const dataSourceLabel = mode === 'api' ? 'API / red' : 'Sin API'
 
@@ -45,6 +48,15 @@ export default function PanelPage() {
         dataSourceLabel={dataSourceLabel}
       />
 
+      {mode === 'api' && clientesLedgerAccessDenied ? (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/95 shadow-sm">
+          <p>{clientesLedgerError}</p>
+          <Link className="mt-2 inline-block text-xs font-medium text-accent hover:underline" to="/credenciales">
+            Abrir Credenciales
+          </Link>
+        </div>
+      ) : null}
+
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-12 lg:items-stretch">
         <div className="flex min-h-0 flex-col gap-4 lg:col-span-3">
           <div className="rounded-2xl border border-line bg-elevated/90 p-4 shadow-card">
@@ -53,6 +65,17 @@ export default function PanelPage() {
               {workspace} · <span className="text-slate-300">{roleLabel}</span>
             </p>
             <ul className="mt-3 space-y-2">
+              <li>
+                <a
+                  href={portalClienteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block rounded-xl border border-accent/25 bg-accent/5 px-3 py-2 transition-colors hover:border-accent/40 hover:bg-accent/10"
+                >
+                  <span className="text-sm font-medium text-slate-200">Abrir Portal de Cliente</span>
+                  <span className="mt-0.5 block text-xs text-muted">Registro operativo de clientes</span>
+                </a>
+              </li>
               {shortcuts.map((s) => (
                 <li key={s.to}>
                   <Link
@@ -88,21 +111,22 @@ export default function PanelPage() {
         <div className="flex min-h-0 flex-col lg:col-span-5">
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-line bg-elevated/90 shadow-card">
             <div className="shrink-0 border-b border-line px-4 py-3 sm:px-5">
-              <h2 className="text-sm font-semibold text-slate-100">
-                {permissions.canRegisterClients ? 'Registros del sistema' : 'Resumen'}
-              </h2>
+              <h2 className="text-sm font-semibold text-slate-100">Clientes en red</h2>
               <p className="text-xs text-muted">
-                {permissions.canRegisterClients
-                  ? 'Últimos clientes en red (GET /clientes). Datos obtenidos desde la red/API.'
-                  : 'Vista de seguimiento'}
+                Últimos clientes (GET /clientes). Datos desde el middleware cuando el modo API está activo.
               </p>
             </div>
             <div className="min-h-0 flex-1 overflow-auto">
-              {clientesLedgerError ? (
+              {clientesLedgerError && !clientesLedgerAccessDenied ? (
                 <p className="px-4 py-6 text-center text-sm text-danger/90">{clientesLedgerError}</p>
               ) : null}
+              {!clientesLedgerLoading && clientesLedgerAccessDenied ? (
+                <p className="px-4 py-8 text-center text-sm text-muted">
+                  No se pudieron cargar los últimos clientes en esta vista.
+                </p>
+              ) : null}
               {!clientesLedgerLoading && !clientesLedgerError && ultimos.length === 0 ? (
-                <p className="px-4 py-8 text-center text-sm text-muted">No hay registros cargados todavía.</p>
+                <p className="px-4 py-8 text-center text-sm text-muted">No hay clientes registrados todavía.</p>
               ) : null}
               {clientesLedgerLoading ? (
                 <p className="px-4 py-8 text-center text-sm text-muted">Cargando clientes…</p>
@@ -114,6 +138,7 @@ export default function PanelPage() {
                       <th className="px-4 py-2 font-medium">clienteId</th>
                       <th className="px-4 py-2 font-medium">Nombre</th>
                       <th className="hidden px-4 py-2 font-medium sm:table-cell">Documento</th>
+                      <th className="px-4 py-2 font-medium">Estado</th>
                       <th className="px-4 py-2 font-medium">Alta</th>
                     </tr>
                   </thead>
@@ -141,7 +166,7 @@ export default function PanelPage() {
             items={actividad}
             title="Actividad reciente"
             subtitle="Operaciones registradas en esta sesión"
-            emptyText="No hay actividades recientes."
+            emptyText="No hay actividad reciente."
             className="min-h-0 flex-1"
             bodyClassName="min-h-0"
           />
@@ -156,7 +181,7 @@ function UltimaFilaCliente({ c }: { c: ClienteApi }) {
     <tr className="hover:bg-surface/40">
       <td className="px-4 py-2">
         <Link
-          to="/registros"
+          to="/clientes-registrados"
           state={{ focusId: c.clienteId }}
           className="font-mono text-xs font-medium text-accent hover:text-accent-hover"
         >
@@ -166,6 +191,9 @@ function UltimaFilaCliente({ c }: { c: ClienteApi }) {
       <td className="max-w-[140px] truncate px-4 py-2 text-muted">{c.nombre}</td>
       <td className="hidden max-w-[140px] truncate px-4 py-2 text-muted sm:table-cell">
         {c.tipoDocumento} {c.numeroDocumento}
+      </td>
+      <td className="px-4 py-2">
+        <ClienteLedgerEstadoBadge c={c} />
       </td>
       <td className="whitespace-nowrap px-4 py-2 text-xs text-muted">{formatShortDate(c.fechaAlta)}</td>
     </tr>

@@ -53,7 +53,7 @@ export function StatSummary({
     {
       label: 'Historial de operaciones',
       value: eventosCount.toLocaleString('es-PE'),
-      hint: 'Registros y operaciones recientes',
+      hint: 'Eventos y operaciones en esta sesión',
       trend: 'Últimos 200',
       trendUp: true,
     },

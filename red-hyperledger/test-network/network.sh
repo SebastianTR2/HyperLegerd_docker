@@ -73,7 +73,7 @@ function checkPrereqs() {
   # use the fabric peer container to see if the samples and binaries match your
   # docker images
   LOCAL_VERSION=$(peer version | sed -ne 's/^ Version: //p')
-  DOCKER_IMAGE_VERSION=$(${CONTAINER_CLI} run --rm hyperledger/fabric-peer:latest peer version | sed -ne 's/^ Version: //p')
+  DOCKER_IMAGE_VERSION=$(${CONTAINER_CLI} run --rm "hyperledger/fabric-peer:${FABRIC_IMAGE_TAG:-2.5.15}" peer version | sed -ne 's/^ Version: //p')
 
   infoln "LOCAL_VERSION=$LOCAL_VERSION"
   infoln "DOCKER_IMAGE_VERSION=$DOCKER_IMAGE_VERSION"
@@ -119,7 +119,7 @@ function checkPrereqs() {
       exit 1
     fi
     CA_LOCAL_VERSION=$(fabric-ca-client version | sed -ne 's/ Version: //p')
-    CA_DOCKER_IMAGE_VERSION=$(${CONTAINER_CLI} run --rm hyperledger/fabric-ca:latest fabric-ca-client version | sed -ne 's/ Version: //p' | head -1)
+    CA_DOCKER_IMAGE_VERSION=$(${CONTAINER_CLI} run --rm "hyperledger/fabric-ca:${FABRIC_CA_IMAGE_TAG:-1.5.15}" fabric-ca-client version | sed -ne 's/ Version: //p' | head -1)
     infoln "CA_LOCAL_VERSION=$CA_LOCAL_VERSION"
     infoln "CA_DOCKER_IMAGE_VERSION=$CA_DOCKER_IMAGE_VERSION"
 
@@ -458,7 +458,11 @@ function networkDown() {
   # Don't remove the generated artifacts -- note, the ledgers are always removed
   if [ "$MODE" != "restart" ]; then
     # Bring down the network, deleting the volumes
-    ${CONTAINER_CLI} volume rm docker_orderer.example.com docker_peer0.org1.example.com docker_peer0.org2.example.com
+    # Compose v2 suele prefijar volúmenes con "compose_"; el prefijo "docker_" era el de docker-compose clásico.
+    ${CONTAINER_CLI} volume rm -f \
+      docker_orderer.example.com docker_peer0.org1.example.com docker_peer0.org2.example.com \
+      compose_orderer.example.com compose_peer0.org1.example.com compose_peer0.org2.example.com \
+      2>/dev/null || true
     #Cleanup the chaincode containers
     clearContainers
     #Cleanup images
@@ -476,6 +480,12 @@ function networkDown() {
 }
 
 . ./network.config
+
+# Interpolación en compose/*.yaml (${FABRIC_IMAGE_TAG} / ${FABRIC_CA_IMAGE_TAG}).
+export FABRIC_IMAGE_TAG="${IMAGETAG}"
+export FABRIC_CA_IMAGE_TAG="${CA_IMAGETAG}"
+if [ "${FABRIC_IMAGE_TAG}" = "default" ]; then export FABRIC_IMAGE_TAG="2.5.15"; fi
+if [ "${FABRIC_CA_IMAGE_TAG}" = "default" ]; then export FABRIC_CA_IMAGE_TAG="1.5.15"; fi
 
 # use this as the default docker-compose yaml definition
 COMPOSE_FILE_BASE=compose-test-net.yaml

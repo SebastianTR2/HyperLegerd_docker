@@ -14,7 +14,7 @@ services:
 
   peer0.org3.example.com:
     container_name: peer0.org3.example.com
-    image: hyperledger/fabric-peer:latest
+    image: hyperledger/fabric-peer:${FABRIC_IMAGE_TAG:-2.5.15}
     labels:
       service: hyperledger-fabric
     environment:

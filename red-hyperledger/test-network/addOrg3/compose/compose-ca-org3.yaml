@@ -9,7 +9,7 @@ networks:
 
 services:
   ca_org3:
-    image: hyperledger/fabric-ca:latest
+    image: hyperledger/fabric-ca:${FABRIC_CA_IMAGE_TAG:-1.5.15}
     labels:
       service: hyperledger-fabric
     environment:

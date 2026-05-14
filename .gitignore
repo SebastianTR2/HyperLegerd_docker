@@ -1,3 +1,6 @@
+# Raíz del monorepo: sin package.json; evita lockfile accidental si se ejecuta npm aquí.
+/package-lock.json
+
 # --- Node / frontend ---
 node_modules/
 **/node_modules/

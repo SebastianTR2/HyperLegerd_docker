@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# deployCC.sh define DELAY; en `network.sh cc invoke|query` no se carga deployCC → usar CLI_DELAY (network.config).
+: "${DELAY:=${CLI_DELAY:-3}}"
+
 # installChaincode PEER ORG
 function installChaincode() {
   ORG=$1

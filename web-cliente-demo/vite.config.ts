@@ -1,24 +1,54 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
+function resolveApiProxyTarget(raw: string | undefined): string {
+  let s = (raw ?? "").trim();
+  if (!s) return "http://127.0.0.1:3000";
+  if (!/^https?:\/\//i.test(s)) s = `http://${s}`;
+  let u: URL;
+  try {
+    u = new URL(s);
+  } catch {
+    return "http://127.0.0.1:3000";
+  }
+  if (u.hostname.startsWith("169.254.")) {
+    console.warn(
+      "[Vite proxy] VITE_API_TARGET usa 169.254.x.x (APIPA). En la misma máquina use http://127.0.0.1:3000",
+    );
+    return "http://127.0.0.1:3000";
+  }
+  if (!u.port && (u.protocol === "http:" || u.protocol === "https:")) {
+    u.port = "3000";
+  }
+  return u.toString().replace(/\/+$/, "");
+}
+
 /**
- * Proxy `/api` → backend (middleware Go).
- * En Windows + backend en WSL: use la IP del adaptador de WSL, p. ej.
- *   set VITE_API_TARGET=http://172.x.x.x:3000
- * El navegador sigue llamando solo a rutas relativas `/api/...`; el target solo lo usa el servidor de desarrollo de Vite.
+ * Proxy `/api` → api-middleware.
+ * Misma máquina: VITE_API_TARGET=http://127.0.0.1:3000 (con puerto).
+ * Windows + backend en WSL: http://IP-de-WSL:3000
  */
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const apiTarget =
-    env.VITE_API_TARGET ||
-    process.env.VITE_API_TARGET ||
-    "http://127.0.0.1:3000";
+  const apiTarget = resolveApiProxyTarget(
+    env.VITE_API_TARGET || process.env.VITE_API_TARGET,
+  );
 
   console.log(`[Vite proxy] /api -> ${apiTarget}`);
 
   return {
     plugins: [react()],
     server: {
+      port: 5173,
+      proxy: {
+        "/api": {
+          target: apiTarget,
+          changeOrigin: true,
+          rewrite: (p) => p.replace(/^\/api/, ""),
+        },
+      },
+    },
+    preview: {
       port: 5173,
       proxy: {
         "/api": {

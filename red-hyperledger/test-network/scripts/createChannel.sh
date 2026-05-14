@@ -50,6 +50,8 @@ createChannel() {
 	local rc=1
 	local COUNTER=1
 	local bft_true=$1
+	# orderer.sh hace >> log.txt; evitar mezclar salidas viejas (p. ej. errores de deployCC) al hacer cat
+	rm -f log.txt
 	infoln "Adding orderers"
 	while [ $rc -ne 0 -a $COUNTER -lt $MAX_RETRY ] ; do
 		sleep $DELAY

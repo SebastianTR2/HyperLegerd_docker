@@ -20,6 +20,8 @@ export type AppRoutePath =
   | '/cuentas-visibles'
   | '/clientes-registrados'
   | '/consultas'
+  | '/auditoria'
+  | '/historial-cliente'
   | '/historial'
   | '/trazabilidad'
   | '/credenciales'

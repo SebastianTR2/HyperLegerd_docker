@@ -13,8 +13,8 @@ const SECTION_META: Record<string, { title: string; subtitle: string }> = {
     subtitle: 'Resumen, accesos rápidos y actividad reciente',
   },
   '/registros': {
-    title: 'Registros del sistema',
-    subtitle: 'Portal operativo, resumen en red y enlaces de auditoría',
+    title: 'Consola / enlaces',
+    subtitle: 'Portal del integrador (enlace externo) y atajos de auditoría',
   },
   '/clientes-registrados': {
     title: 'Clientes registrados',
@@ -31,6 +31,10 @@ const SECTION_META: Record<string, { title: string; subtitle: string }> = {
   '/consultas': {
     title: 'Consultas',
     subtitle: 'Buscar por clienteId exacto',
+  },
+  '/auditoria': {
+    title: 'Auditar',
+    subtitle: 'Bitácora HTTP + eventos de cadena (GET /auditoria/combinada)',
   },
   '/historial': {
     title: 'Historial',
@@ -57,6 +61,12 @@ export function TopBar({ onMenuClick }: TopBarProps) {
   const { mode, apiKey, role, roleLabel } = useSettings()
   const workspace = workspaceLabel(role)
   const meta = useMemo(() => {
+    if (pathname.startsWith('/historial-cliente')) {
+      return {
+        title: 'Historial en cadena',
+        subtitle: 'GET /api/clientes/historial/:clienteId',
+      }
+    }
     const base = SECTION_META[pathname] ?? SECTION_META['/']
     if (pathname === '/consultas') {
       return { ...base, subtitle: 'GET /api/clientes/:clienteId (proxy al middleware)' }

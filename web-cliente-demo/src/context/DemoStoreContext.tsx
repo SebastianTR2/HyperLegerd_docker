@@ -19,6 +19,7 @@ import { describeApiError, isCredentialHttpError } from '../lib/apiErrorMessage'
 import { loadApiClientesCache, saveApiClientesCache, upsertApiClienteCache as upsertApiClienteInList } from '../lib/apiClientesCache'
 import { loadTraceEntries, saveTraceEntries } from '../lib/tracePersist'
 import { listarClientesApi } from '../services/apiClientesLista'
+import { useSettings } from './SettingsContext'
 import type { ClienteApi, ClienteApiCacheRow } from '../types/api'
 import type { DemoEvent, DemoEventType, TokenOperacion, TraceEntry } from '../types/demo'
 import type { Registro, RegistroInput } from '../types/registro'
@@ -112,6 +113,7 @@ function appendEvent(prev: DemoEvent[], ev: Omit<DemoEvent, 'id' | 'fechaIso'> &
 }
 
 export function DemoStoreProvider({ children }: { children: ReactNode }) {
+  const { mode, apiKey } = useSettings()
   const boot = useRef(loadDemoState())
   const [registros, setRegistros] = useState<Registro[]>(() => boot.current.registros)
   const [eventos, setEventos] = useState<DemoEvent[]>(() => boot.current.eventos)
@@ -141,8 +143,20 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    if (mode !== 'api') {
+      setClientesLedger([])
+      setClientesLedgerError(null)
+      setClientesLedgerAccessDenied(false)
+      return
+    }
+    if (!apiKey.trim()) {
+      setClientesLedger([])
+      setClientesLedgerError(null)
+      setClientesLedgerAccessDenied(true)
+      return
+    }
     void refreshClientesLedger()
-  }, [refreshClientesLedger])
+  }, [refreshClientesLedger, mode, apiKey])
 
   useEffect(() => {
     saveDemoState({ version: 2, registros, eventos, tokenOps })

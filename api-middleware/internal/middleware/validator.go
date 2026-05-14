@@ -4,6 +4,7 @@ import (
 	"api-middleware/pkg/models"
 	"context"
 	"log"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -84,11 +85,26 @@ func OapiValidator(specPath string) gin.HandlerFunc {
 	inner := ginmiddleware.OapiRequestValidatorWithOptions(swagger, options)
 
 	// Las rutas bajo /admin/ no forman parte del contrato OpenAPI público; se omiten aquí de forma explícita.
+	// /auditoria y /api/auditoria se omiten: kin-openapi + gorilla/mux pueden fallar si el spec o el path visto por el servidor no coinciden (p. ej. prefijo /api sin rewrite).
 	return func(c *gin.Context) {
-		if strings.HasPrefix(c.Request.URL.Path, "/admin/") {
+		if omitirValidacionOpenAPI(c.Request.URL.Path) {
 			c.Next()
 			return
 		}
 		inner(c)
 	}
+}
+
+// omitirValidacionOpenAPI evita kin-openapi en rutas operativas que no deben bloquearse por el contrato cargado.
+// Incluye /api/auditoria/… por si el backend recibe el prefijo /api sin rewrite (p. ej. proxy distinto al de Vite).
+func omitirValidacionOpenAPI(raw string) bool {
+	p := path.Clean("/" + strings.TrimPrefix(strings.TrimSpace(raw), "/"))
+	low := strings.ToLower(p)
+	if strings.HasPrefix(low, "/admin") {
+		return true
+	}
+	if strings.HasPrefix(low, "/auditoria/") || strings.HasPrefix(low, "/api/auditoria/") {
+		return true
+	}
+	return false
 }

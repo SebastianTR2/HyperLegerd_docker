@@ -56,6 +56,13 @@ func SetupRoutes(router *gin.Engine) {
 	router.GET("/eventos/stream", append(authIntegradorOAdmin, handlers.StreamEventos)...)
 	router.GET("/eventos/historial", append(authCualquierRol, handlers.ObtenerUltimosEventos)...)
 
+	// Auditoría del puente (bitácora en memoria + vista combinada con eventos de cadena)
+	router.GET("/auditoria/http", append(authCualquierRol, handlers.ListarAuditoriaHTTP)...)
+	router.GET("/auditoria/combinada", append(authCualquierRol, handlers.ListarAuditoriaCombinada)...)
+	// Alias: peticiones al :3000 con prefijo /api (p. ej. proxy sin rewrite)
+	router.GET("/api/auditoria/http", append(authCualquierRol, handlers.ListarAuditoriaHTTP)...)
+	router.GET("/api/auditoria/combinada", append(authCualquierRol, handlers.ListarAuditoriaCombinada)...)
+
 	// Rutas administrativas: fuera del OpenAPI público; validación omitida en middleware y API key obligatoria
 	admin := router.Group("/admin")
 	admin.Use(middleware.AdminAPIKey())

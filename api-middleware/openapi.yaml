@@ -16,14 +16,10 @@ info:
     subrayado, máx. 128 caracteres) para reutilizar ese valor como id de operación en bitácora.
 
 servers:
-  # La URL relativa permite que kin-openapi empareje peticiones con cualquier Host (p. ej. 127.0.0.1 vs localhost).
-  # Sin esto, GET http://127.0.0.1:3000/... puede fallar con "no matching operation was found" si solo existe http://localhost:3000.
+  # Solo URL relativa: el router kin-openapi/gorillamux empareja cualquier Host (127.0.0.1, localhost, IP LAN, etc.).
+  # Entradas absolutas adicionales duplicaban rutas y podían provocar "no matching operation was found" según el Host de la petición.
   - url: /
     description: Base relativa — validación OpenAPI compatible con cualquier host/puerto
-  - url: http://127.0.0.1:3000
-    description: Ejemplo local (IP loopback)
-  - url: http://localhost:3000
-    description: Ejemplo local (hostname)
 
 tags:
   - name: clientes
@@ -34,6 +30,10 @@ tags:
     description: Invocación controlada de chaincode (lista blanca, evaluate o submit)
   - name: eventos
     description: Monitoreo de eventos emitidos por chaincode (SSE e historial en memoria)
+  - name: auditoria
+    description: >-
+      Bitácora del puente HTTP (BITACORA_SOLICITUD / BITACORA_RESULTADO) y líneas chaincode/evento retenidas en memoria.
+      Complementario a GET /eventos/historial (solo ledger). Correlación: `operacionId` en solicitud y resultado coincide con la cabecera `X-Operacion-Id`.
 
 paths:
   /clientes:
@@ -603,6 +603,165 @@ paths:
       responses:
         '200':
           description: Historial reciente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaLectura'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
+  /auditoria/http:
+    get:
+      security:
+        - ApiKeyAuth: []
+      tags: [auditoria]
+      summary: Bitácora del puente en memoria
+      description: >-
+        Devuelve las últimas líneas de bitácora retenidas en RAM (solicitud HTTP, resultado HTTP, invocaciones chaincode
+        auditadas, fallos de eventos, conexión Fabric). Filtros opcionales `desde` y `hasta` (RFC3339 o fecha) aplican al
+        campo `timestamp` de cada registro JSON. `limite` por defecto 100 (máx. 500). No sustituye archivo opcional
+        `CHAINCODE_BITACORA_FILE`: para exportación durable tail ese archivo o logs del proceso.
+      parameters:
+        - in: query
+          name: limite
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+        - in: query
+          name: desde
+          schema: { type: string, example: '2026-05-01T00:00:00Z' }
+          description: Inclusive — conserva registros con timestamp >= desde
+        - in: query
+          name: hasta
+          schema: { type: string, example: '2026-05-14T23:59:59Z' }
+          description: Inclusive — conserva registros con timestamp <= hasta
+      responses:
+        '200':
+          description: Líneas de auditoría
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaLectura'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
+  /auditoria/combinada:
+    get:
+      security:
+        - ApiKeyAuth: []
+      tags: [auditoria]
+      summary: Bitácora del puente + eventos de chaincode recientes
+      description: >-
+        Combina GET /auditoria/http (misma semántica de query) con el historial en memoria de GET /eventos/historial
+        (`eventosCadena`). Útil para pantallas de auditoría que contrastan tráfico API vs emisiones en ledger.
+      parameters:
+        - in: query
+          name: limite
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+        - in: query
+          name: desde
+          schema: { type: string }
+        - in: query
+          name: hasta
+          schema: { type: string }
+      responses:
+        '200':
+          description: Objeto combinado en `datos`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaLectura'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
+  # Misma semántica que /auditoria/* — útil cuando el cliente o un proxy dejan el prefijo /api en la ruta hacia :3000.
+  /api/auditoria/http:
+    get:
+      security:
+        - ApiKeyAuth: []
+      tags: [auditoria]
+      summary: Bitácora del puente en memoria (prefijo /api)
+      description: Alias de GET /auditoria/http para despliegues sin strip de /api.
+      parameters:
+        - in: query
+          name: limite
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+        - in: query
+          name: desde
+          schema: { type: string, example: '2026-05-01T00:00:00Z' }
+          description: Inclusive — conserva registros con timestamp >= desde
+        - in: query
+          name: hasta
+          schema: { type: string, example: '2026-05-14T23:59:59Z' }
+          description: Inclusive — conserva registros con timestamp <= hasta
+      responses:
+        '200':
+          description: Líneas de auditoría
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaLectura'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
+  /api/auditoria/combinada:
+    get:
+      security:
+        - ApiKeyAuth: []
+      tags: [auditoria]
+      summary: Bitácora del puente + eventos de chaincode (prefijo /api)
+      description: Alias de GET /auditoria/combinada para despliegues sin strip de /api.
+      parameters:
+        - in: query
+          name: limite
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+        - in: query
+          name: desde
+          schema: { type: string }
+        - in: query
+          name: hasta
+          schema: { type: string }
+      responses:
+        '200':
+          description: Objeto combinado en `datos`
           content:
             application/json:
               schema:
@@ -1403,6 +1562,15 @@ components:
             - type: number
             - type: integer
             - type: boolean
+        payloadDecodificado:
+          description: >-
+            Si el payload de Fabric era JSON válido, replica el valor tipado de `datos` para clientes que lean solo este campo.
+            Ausente cuando `datos` es texto opaco (no JSON).
+          nullable: true
+        payloadRaw:
+          type: string
+          description: >-
+            Cuerpo UTF-8 devuelto por el peer antes del parseo. Solo se envía si se solicita `?incluirPayloadRaw=1` o cabecera `X-Debug-Payload: 1`.
 
     OperacionHistorial:
       type: object

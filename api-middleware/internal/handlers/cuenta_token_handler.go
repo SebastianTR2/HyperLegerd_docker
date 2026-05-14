@@ -45,12 +45,7 @@ func ListarCuentasToken(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, models.RespuestaLectura{
-		Ok:      true,
-		Codigo:  "CONSULTA_EXITOSA",
-		Mensaje: "Listado de cuentas token visibles",
-		Datos:   datos,
-	})
+	c.JSON(http.StatusOK, respuestaLecturaTipada(c, "CONSULTA_EXITOSA", "Listado de cuentas token visibles", datos, raw))
 }
 
 // CrearCuentaTokenVisible registra una nueva cuenta visible en ledger.
@@ -105,9 +100,7 @@ func ObtenerCuentaTokenVisible(c *gin.Context) {
 		})
 		return
 	}
-	c.JSON(http.StatusOK, models.RespuestaLectura{
-		Ok: true, Codigo: "CONSULTA_EXITOSA", Mensaje: "Cuenta encontrada", Datos: v,
-	})
+	c.JSON(http.StatusOK, respuestaLecturaTipada(c, "CONSULTA_EXITOSA", "Cuenta encontrada", v, raw))
 }
 
 // ConsultarSaldoCuentaTokenVisible consulta solo el saldo numérico.
@@ -157,16 +150,12 @@ func ConsultarSaldoCuentaTokenVisible(c *gin.Context) {
 			return
 		}
 	}
-	c.JSON(http.StatusOK, models.RespuestaLectura{
-		Ok:      true,
-		Codigo:  "CONSULTA_EXITOSA",
-		Mensaje: "Saldo de cuenta visible",
-		Datos: models.SaldoToken{
-			ClienteId:   alias,
-			CodigoToken: tokenCodeDefault,
-			Saldo:       saldo,
-		},
-	})
+	saldoResp := models.SaldoToken{
+		ClienteId:   alias,
+		CodigoToken: tokenCodeDefault,
+		Saldo:       saldo,
+	}
+	c.JSON(http.StatusOK, respuestaLecturaTipada(c, "CONSULTA_EXITOSA", "Saldo de cuenta visible", saldoResp, raw))
 }
 
 // EmitirACuentaTokenVisible emite tokens hacia una cuenta visible (Mint + transfer interno).

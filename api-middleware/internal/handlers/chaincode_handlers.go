@@ -6,7 +6,6 @@ import (
 	"api-middleware/internal/fabric"
 	"api-middleware/internal/middleware"
 	"api-middleware/pkg/models"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"sync"
@@ -104,19 +103,8 @@ func invocarChaincodeConPoliticas(c *gin.Context, audiencia string, reglas []cha
 			c.JSON(st, models.RespuestaError{Ok: false, Codigo: cod, Mensaje: pub})
 			return
 		}
-		var datos interface{}
-		if len(payload) == 0 {
-			datos = nil
-		} else if json.Unmarshal(payload, &datos) != nil {
-			datos = string(payload)
-		}
 		registrarBitacoraChaincode(c, audiencia, req, "exito", http.StatusOK, "CONSULTA_EXITOSA", "", "")
-		c.JSON(http.StatusOK, models.RespuestaLectura{
-			Ok:      true,
-			Codigo:  "CONSULTA_EXITOSA",
-			Mensaje: "Invocación evaluate completada",
-			Datos:   datos,
-		})
+		c.JSON(http.StatusOK, respuestaLecturaFabric(c, payload, "Invocación evaluate completada"))
 	default: // submit
 		res, err := fabric.InvokeTransactionWithTxIDEnCanal(req.Canal, req.Contrato, req.Funcion, req.Parametros...)
 		if err != nil {

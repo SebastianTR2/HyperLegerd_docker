@@ -113,12 +113,7 @@ func ListarClientes(c *gin.Context) {
 	if clientes == nil {
 		clientes = []models.Cliente{}
 	}
-	c.JSON(http.StatusOK, models.RespuestaLectura{
-		Ok:      true,
-		Codigo:  "CONSULTA_EXITOSA",
-		Mensaje: "Listado de clientes registrados",
-		Datos:   clientes,
-	})
+	c.JSON(http.StatusOK, respuestaLecturaTipada(c, "CONSULTA_EXITOSA", "Listado de clientes registrados", clientes, raw))
 }
 
 // ConsultarCliente obtiene los datos de un cliente desde el ledger.
@@ -164,12 +159,7 @@ func ConsultarCliente(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, models.RespuestaLectura{
-		Ok:      true,
-		Codigo:  "CONSULTA_EXITOSA",
-		Mensaje: "Cliente consultado correctamente",
-		Datos:   cliente,
-	})
+	c.JSON(http.StatusOK, respuestaLecturaTipada(c, "CONSULTA_EXITOSA", "Cliente consultado correctamente", cliente, result))
 }
 
 // ActualizarCliente aplica cambios parciales conservando clienteId y fechaAlta del ledger.

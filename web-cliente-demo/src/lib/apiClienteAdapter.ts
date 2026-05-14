@@ -30,6 +30,15 @@ export function parseClienteDatos(datos: unknown): ClienteApiCacheRow | null {
   }
 }
 
+/** Usa `payloadDecodificado` si viene en la respuesta OpenAPI ampliada. */
+export function parseClienteDesdeLectura(res: {
+  datos?: unknown
+  payloadDecodificado?: unknown
+}): ClienteApiCacheRow | null {
+  const src = res.payloadDecodificado ?? res.datos
+  return parseClienteDatos(src)
+}
+
 export function clienteApiToRegistro(c: ClienteApiCacheRow, txId?: string): Registro {
   const ref = txId ?? c._ultimoTxId
   return {

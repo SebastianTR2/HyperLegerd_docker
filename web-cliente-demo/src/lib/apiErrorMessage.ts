@@ -11,6 +11,9 @@ export function describeApiError(e: unknown): string {
       console.warn('[API acceso]', e.status, e.payload?.codigo ?? '', e.payload?.mensaje ?? e.message)
       return 'Credencial inválida. Verifica la clave en la sección Credenciales.'
     }
+    if (e.status === 404 && e.payload?.codigo === 'ERROR_VALIDACION_OPENAPI') {
+      return `${e.status} — Contrato OpenAPI en el servidor no reconoce esta ruta (spec desactualizado o ruta distinta). Reiniciá el middleware Go con el código actual del repo o revisá OPENAPI_SPEC. Detalle: ${e.payload.mensaje ?? e.message}`
+    }
     const code = e.payload?.codigo ? `${e.payload.codigo} · ` : ''
     const detail = e.payload?.mensaje ?? e.message
     if (

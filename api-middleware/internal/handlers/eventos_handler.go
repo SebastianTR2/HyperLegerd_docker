@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"api-middleware/internal/fabric"
-	"api-middleware/pkg/models"
 
 	"github.com/gin-gonic/gin"
 )
@@ -66,12 +65,5 @@ func StreamEventos(c *gin.Context) {
 // Devuelve un JSON tradicional con el historial reciente almacenado en memoria.
 func ObtenerUltimosEventos(c *gin.Context) {
 	historial := fabric.GlobalEventBroker.GetHistorial()
-	
-	// Reutilizamos la estructura de respuesta estándar del proyecto
-	c.JSON(http.StatusOK, models.RespuestaLectura{
-		Ok:      true,
-		Codigo:  "EVENTOS_HISTORIAL",
-		Mensaje: "Historial de eventos recientes obtenido exitosamente",
-		Datos:   historial,
-	})
+	c.JSON(http.StatusOK, respuestaLecturaTipada(c, "EVENTOS_HISTORIAL", "Historial de eventos recientes obtenido exitosamente", historial, nil))
 }

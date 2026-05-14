@@ -11,12 +11,13 @@ import { ClienteLedgerEstadoBadge } from '../components/ClienteLedgerEstadoBadge
 
 const shortcutsBase = [
   { to: '/clientes-registrados', label: 'Ver clientes registrados', desc: 'Listado desde GET /clientes' },
+  { to: '/auditoria', label: 'Auditoría del puente', desc: 'HTTP + eventos cadena, exportación CSV/JSON' },
   { to: '/historial', label: 'Revisar actividad', desc: 'Operaciones registradas en esta sesión' },
-  { to: '/trazabilidad', label: 'Auditar operaciones', desc: 'Trazas y comprobación técnica' },
+  { to: '/trazabilidad', label: 'Trazas y TXID', desc: 'Línea de tiempo y comprobación técnica' },
   { to: '/cuentas-visibles', label: 'Ver cuentas token visibles', desc: 'Estado en ledger' },
   { to: '/tokens', label: 'Operaciones con tokens', desc: 'Emisión y transferencia vía API' },
   { to: '/consultas', label: 'Consultas', desc: 'Cliente por clienteId exacto' },
-  { to: '/registros', label: 'Registros del sistema', desc: 'Portal operativo y resumen en red' },
+  { to: '/registros', label: 'Consola / enlaces', desc: 'Portal operativo y resumen en red' },
   { to: '/credenciales', label: 'Credenciales', desc: 'Rol y clave de acceso' },
 ] as const
 
@@ -50,7 +51,11 @@ export default function PanelPage() {
 
       {mode === 'api' && clientesLedgerAccessDenied ? (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/95 shadow-sm">
-          <p>{clientesLedgerError}</p>
+          <p>
+            {clientesLedgerError?.trim()
+              ? clientesLedgerError
+              : 'Falta la cabecera X-API-Key o la clave no coincide con el middleware. Configurá Credenciales en modo API.'}
+          </p>
           <Link className="mt-2 inline-block text-xs font-medium text-accent hover:underline" to="/credenciales">
             Abrir Credenciales
           </Link>
@@ -187,6 +192,15 @@ function UltimaFilaCliente({ c }: { c: ClienteApi }) {
         >
           {c.clienteId}
         </Link>
+        <div className="mt-1 flex flex-wrap gap-x-2 text-[10px]">
+          <Link className="text-muted hover:text-accent" to={`/historial-cliente/${encodeURIComponent(c.clienteId)}`}>
+            Historial
+          </Link>
+          <span className="text-line">·</span>
+          <Link className="text-muted hover:text-accent" to="/consultas" state={{ clienteId: c.clienteId }}>
+            Consulta
+          </Link>
+        </div>
       </td>
       <td className="max-w-[140px] truncate px-4 py-2 text-muted">{c.nombre}</td>
       <td className="hidden max-w-[140px] truncate px-4 py-2 text-muted sm:table-cell">

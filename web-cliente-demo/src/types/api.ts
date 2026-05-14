@@ -11,6 +11,18 @@ export interface ClienteApi {
   notas?: string
 }
 
+export interface RegistroHistorialClienteApi {
+  txId: string
+  timestamp: string
+  isDelete: boolean
+  record?: ClienteApi | null
+}
+
+export interface HistorialClienteApi {
+  clienteId: string
+  operaciones: RegistroHistorialClienteApi[]
+}
+
 /** Fila en caché local tras un alta por API (no se envía al backend). */
 export type ClienteApiCacheRow = ClienteApi & { _ultimoTxId?: string }
 
@@ -40,9 +52,14 @@ export interface RespuestaError {
   mensaje: string
 }
 
-export interface RespuestaLecturaCliente {
+/** Respuesta estándar de lectura del middleware (OpenAPI RespuestaLectura). */
+export interface RespuestaLectura {
   ok: boolean
   codigo: string
   mensaje: string
   datos: unknown
+  payloadDecodificado?: unknown
+  payloadRaw?: string
 }
+
+export type RespuestaLecturaCliente = RespuestaLectura

@@ -233,12 +233,7 @@ func ConsultarSaldo(c *gin.Context) {
 		Saldo:       saldo,
 	}
 
-	c.JSON(http.StatusOK, models.RespuestaLectura{
-		Ok:      true,
-		Codigo:  "CONSULTA_EXITOSA",
-		Mensaje: "Saldo consultado correctamente",
-		Datos:   saldoResp,
-	})
+	c.JSON(http.StatusOK, respuestaLecturaTipada(c, "CONSULTA_EXITOSA", "Saldo consultado correctamente", saldoResp, result))
 }
 
 // ConsultarHistorial obtiene la lista de operaciones desde el ledger.

@@ -17,8 +17,10 @@ type RespuestaError struct {
 
 // RespuestaLectura representa una respuesta exitosa de consulta (solo lectura).
 type RespuestaLectura struct {
-	Ok      bool        `json:"ok"`
-	Codigo  string      `json:"codigo"`
-	Mensaje string      `json:"mensaje"`
-	Datos   interface{} `json:"datos"`
+	Ok                  bool        `json:"ok"`
+	Codigo              string      `json:"codigo"`
+	Mensaje             string      `json:"mensaje"`
+	Datos               interface{} `json:"datos"`
+	PayloadDecodificado interface{} `json:"payloadDecodificado,omitempty"`
+	PayloadRaw          string      `json:"payloadRaw,omitempty"`
 }

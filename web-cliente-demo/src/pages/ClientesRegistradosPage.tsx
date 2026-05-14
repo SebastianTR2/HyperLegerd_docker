@@ -76,6 +76,7 @@ export default function ClientesRegistradosPage() {
                 <th className="px-4 py-2 font-medium">nombre</th>
                 <th className="px-4 py-2 font-medium">documento</th>
                 <th className="px-4 py-2 font-medium">estado</th>
+                <th className="px-4 py-2 text-right font-medium">acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -96,6 +97,19 @@ export default function ClientesRegistradosPage() {
                   </td>
                   <td className="px-4 py-2">
                     <ClienteLedgerEstadoBadge c={r} />
+                  </td>
+                  <td className="px-4 py-2 text-right text-xs">
+                    <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
+                      <Link className="text-accent hover:underline" to="/consultas" state={{ clienteId: r.clienteId }}>
+                        Detalle
+                      </Link>
+                      <Link
+                        className="text-muted hover:text-accent hover:underline"
+                        to={`/historial-cliente/${encodeURIComponent(r.clienteId)}`}
+                      >
+                        Historial
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}

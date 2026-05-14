@@ -89,9 +89,6 @@ export function rolePermissions(role: AppRole): RolePermissions {
 }
 
 export function routeAllowedForRole(role: AppRole, path: AppRoutePath): boolean {
-  if (role === 'admin') return true
-  if (role === 'integrador') {
-    return path !== '/tokens'
-  }
-  return path !== '/tokens' && path !== '/registros'
+  if (path === '/tokens' && role !== 'admin') return false
+  return true
 }

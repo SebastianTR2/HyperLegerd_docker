@@ -1,8 +1,11 @@
 import type { ClienteApiCacheRow } from '../types/api'
 import type { Registro } from '../types/registro'
 
-function mapEstado(estado: string): Registro['estado'] {
-  const u = estado.toUpperCase()
+function mapEstado(estado: string, notas?: string): Registro['estado'] {
+  const u = estado.toUpperCase().replace(/\s+/g, '_')
+  const n = notas ?? ''
+  if (u === 'DADO_DE_BAJA') return 'baja'
+  if (u === 'INACTIVO' && n.includes('[baja-logica-api]')) return 'baja'
   if (u === 'ACTIVO') return 'activo'
   if (u === 'INACTIVO') return 'inactivo'
   return 'pendiente'
@@ -36,7 +39,7 @@ export function clienteApiToRegistro(c: ClienteApiCacheRow, txId?: string): Regi
     nombreCompleto: c.nombre,
     email: c.email ?? '',
     facultad: c.notas?.trim() ? c.notas : '—',
-    estado: mapEstado(c.estado),
+    estado: mapEstado(c.estado, c.notas),
     fechaRegistro: c.fechaAlta,
     telefono: c.telefono?.trim() || undefined,
     referenciaTrazabilidad: ref,

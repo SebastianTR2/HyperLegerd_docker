@@ -80,6 +80,16 @@ paths:
                 ok: false
                 codigo: VALIDACION
                 mensaje: Faltan campos obligatorios
+        '409':
+          description: El identificador de cliente ya existe en el ledger
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+              example:
+                ok: false
+                codigo: CLIENTE_EXISTENTE
+                mensaje: El código de cliente ya está en uso
         '401':
           description: Falta la cabecera X-API-Key
           content:
@@ -184,6 +194,139 @@ paths:
                 $ref: '#/components/schemas/RespuestaError'
         '403':
           description: API key inválida o rol sin permiso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+    patch:
+      security:
+        - ApiKeyAuth: []
+      tags: [clientes]
+      summary: Actualizar cliente (campos editables)
+      description: >-
+        Actualización parcial vía chaincode UpdateAsset. No modifica `clienteId` ni `fechaAlta`
+        (se conservan los valores del ledger). El estado `DADO_DE_BAJA` solo se aplica con
+        `POST /clientes/{clienteId}/baja`. Un cliente ya dado de baja no admite edición.
+      parameters:
+        - name: clienteId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: CLI001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientePatch'
+            example:
+              nombre: Juan Perez Actualizado
+              telefono: "70000001"
+              notas: Actualizado desde portal
+      responses:
+        '200':
+          description: Cliente actualizado en el ledger
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaExitoTx'
+        '400':
+          description: Validación o cuerpo vacío
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso (solo integrador o admin)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '404':
+          description: Cliente no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '409':
+          description: Cliente dado de baja; no editable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+              example:
+                ok: false
+                codigo: CLIENTE_NO_EDITABLE
+                mensaje: El cliente fue dado de baja y no admite modificaciones
+        '500':
+          description: Error interno al invocar la blockchain
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
+  /clientes/{clienteId}/baja:
+    post:
+      security:
+        - ApiKeyAuth: []
+      tags: [clientes]
+      summary: Dar de baja lógica a un cliente
+      description: >-
+        Baja lógica sin borrar el asset: el middleware lee el cliente, añade auditoría en `notas` e invoca
+        `UpdateAsset` (mismo flujo que PATCH). Intenta estado `DADO_DE_BAJA`; si el chaincode desplegado no lo
+        permite, aplica `INACTIVO` con marca `[baja-logica-api]` en notas. Historial MVCC intacto.
+        Requiere rol integrador o admin.
+      parameters:
+        - name: clienteId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: CLI001
+      responses:
+        '200':
+          description: Baja registrada en el ledger
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaExitoTx'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '404':
+          description: Cliente no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '409':
+          description: El cliente ya estaba dado de baja
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+              example:
+                ok: false
+                codigo: CLIENTE_YA_DADO_DE_BAJA
+                mensaje: El cliente ya fue dado de baja
+        '500':
+          description: Error interno al invocar la blockchain
           content:
             application/json:
               schema:
@@ -1036,8 +1179,10 @@ components:
           description: Fecha de registro del cliente (ISO 8601 fecha)
         estado:
           type: string
-          description: Estado actual del cliente
-          enum: [ACTIVO, INACTIVO]
+          description: >-
+            Estado en ledger. En el alta solo ACTIVO o INACTIVO; tras baja lógica puede ser DADO_DE_BAJA
+            en lecturas.
+          enum: [ACTIVO, INACTIVO, DADO_DE_BAJA]
         telefono:
           type: string
           description: Teléfono del cliente
@@ -1048,6 +1193,32 @@ components:
         notas:
           type: string
           description: Información adicional del cliente
+
+    ClientePatch:
+      type: object
+      description: >-
+        Campos opcionales para PATCH. Debe incluirse al menos uno. No use este cuerpo para
+        `DADO_DE_BAJA` (use POST /clientes/{clienteId}/baja).
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+        tipoDocumento:
+          type: string
+          enum: [CI, NIT, PASAPORTE]
+        numeroDocumento:
+          type: string
+          minLength: 1
+        telefono:
+          type: string
+        email:
+          type: string
+          format: email
+        notas:
+          type: string
+        estado:
+          type: string
+          enum: [ACTIVO, INACTIVO]
 
     EmitirToken:
       type: object

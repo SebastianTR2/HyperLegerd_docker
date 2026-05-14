@@ -40,6 +40,7 @@ export function registroToClienteForm(r: Registro): ClienteApi {
       : todayYmd()
   let estadoApi = 'ACTIVO'
   if (r.estado === 'inactivo') estadoApi = 'INACTIVO'
+  else if (r.estado === 'baja') estadoApi = 'DADO_DE_BAJA'
   else if (r.estado === 'pendiente') estadoApi = 'ACTIVO'
 
   return {
@@ -57,7 +58,8 @@ export function registroToClienteForm(r: Registro): ClienteApi {
 
 /** Convierte el formulario unificado al input de la demo local. */
 export function clienteFormToRegistroInput(c: ClienteApi): RegistroInput {
-  const estado: RegistroInput['estado'] = c.estado === 'INACTIVO' ? 'inactivo' : 'activo'
+  const estado: RegistroInput['estado'] =
+    c.estado === 'INACTIVO' ? 'inactivo' : c.estado === 'DADO_DE_BAJA' ? 'baja' : 'activo'
   return {
     clienteId: c.clienteId.trim(),
     tipoDocumento: c.tipoDocumento,

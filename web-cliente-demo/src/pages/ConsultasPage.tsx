@@ -98,8 +98,8 @@ export default function ConsultasPage() {
       <div>
         <h1 className="text-lg font-semibold text-slate-100">Consultas</h1>
         <p className="mt-1 text-sm text-muted">
-          Buscar por <strong className="text-slate-300">clienteId exacto</strong>. No se busca por nombre ni por número de documento
-          en esta pantalla.
+          Consulta administrativa por <strong className="text-slate-300">clienteId exacto</strong>. No se busca por nombre ni
+          por número de documento en esta pantalla. El alta de clientes se realiza desde el Portal de Cliente.
         </p>
       </div>
 
@@ -152,7 +152,9 @@ function ApiResultView({ r }: { r: Registro }) {
             ? 'border-success/30 bg-success/15 text-success'
             : r.estado === 'pendiente'
               ? 'border-amber-500/25 bg-amber-500/10 text-amber-200'
-              : 'border-slate-500/25 bg-slate-500/10 text-slate-400'
+              : r.estado === 'baja'
+                ? 'border-rose-500/30 bg-rose-500/15 text-rose-200'
+                : 'border-slate-500/25 bg-slate-500/10 text-slate-400'
         }`}
       >
         Estado: {r.estado}

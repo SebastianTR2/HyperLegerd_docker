@@ -134,6 +134,7 @@ function EstadoBadge({ estado }: { estado: Registro['estado'] }) {
     activo: 'bg-success/15 text-success border-success/25',
     inactivo: 'bg-slate-500/15 text-slate-400 border-slate-500/25',
     pendiente: 'bg-amber-500/10 text-amber-200/90 border-amber-500/20',
+    baja: 'bg-rose-500/10 text-rose-200/95 border-rose-500/25',
   }
   return (
     <span

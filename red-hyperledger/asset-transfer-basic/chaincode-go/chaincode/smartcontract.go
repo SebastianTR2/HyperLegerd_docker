@@ -3,6 +3,7 @@ package chaincode
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
@@ -55,7 +56,7 @@ func (s *SmartContract) CreateAsset(ctx contractapi.TransactionContextInterface,
 		return err
 	}
 	if exists {
-		return fmt.Errorf("the asset %s already exists", id)
+		return fmt.Errorf("CLIENTE_EXISTENTE: el código %s ya está en uso", id)
 	}
 
 	asset := Asset{
@@ -111,6 +112,17 @@ func (s *SmartContract) UpdateAsset(ctx contractapi.TransactionContextInterface,
 		return fmt.Errorf("the asset %s does not exist", id)
 	}
 
+	prev, err := s.ReadAsset(ctx, id)
+	if err != nil {
+		return err
+	}
+	if strings.ToUpper(strings.TrimSpace(prev.Estado)) == "DADO_DE_BAJA" {
+		return fmt.Errorf("CLIENTE_NO_EDITABLE: el cliente fue dado de baja y no admite modificaciones")
+	}
+	if strings.ToUpper(strings.TrimSpace(estado)) == "DADO_DE_BAJA" {
+		return fmt.Errorf("CLIENTE_BAJA_VIA_ENDPOINT: el estado DADO_DE_BAJA solo se aplica mediante la operación de baja lógica")
+	}
+
 	// overwriting original asset with new asset
 	asset := Asset{
 		ClienteId:       id,
@@ -134,6 +146,38 @@ func (s *SmartContract) UpdateAsset(ctx contractapi.TransactionContextInterface,
 	}
 
 	return ctx.GetStub().PutState(id, assetJSON)
+}
+
+// BajaCliente marca el cliente como DADO_DE_BAJA sin borrar el asset (baja lógica; el historial MVCC se conserva).
+// lineaAuditoria: texto opcional (p. ej. fecha y rol) que se añade a notas.
+func (s *SmartContract) BajaCliente(ctx contractapi.TransactionContextInterface, clienteId string, lineaAuditoria string) error {
+	asset, err := s.ReadAsset(ctx, clienteId)
+	if err != nil {
+		return err
+	}
+	switch strings.ToUpper(strings.TrimSpace(asset.Estado)) {
+	case "DADO_DE_BAJA":
+		return fmt.Errorf("CLIENTE_YA_DADO_DE_BAJA: el cliente ya fue dado de baja")
+	}
+
+	asset.Estado = "DADO_DE_BAJA"
+	la := strings.TrimSpace(lineaAuditoria)
+	if la != "" {
+		if strings.TrimSpace(asset.Notas) != "" {
+			asset.Notas = asset.Notas + "\n" + la
+		} else {
+			asset.Notas = la
+		}
+	}
+
+	assetJSON, err := json.Marshal(asset)
+	if err != nil {
+		return err
+	}
+	if err := ctx.GetStub().SetEvent("BajaCliente", assetJSON); err != nil {
+		return fmt.Errorf("failed to set event: %v", err)
+	}
+	return ctx.GetStub().PutState(clienteId, assetJSON)
 }
 
 // DeleteAsset deletes an given asset from the world state.

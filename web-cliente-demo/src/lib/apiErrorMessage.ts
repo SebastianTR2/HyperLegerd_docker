@@ -1,7 +1,16 @@
 import { ApiHttpError } from '../services/apiClient'
 
+export function isCredentialHttpError(e: unknown): boolean {
+  if (!(e instanceof ApiHttpError)) return false
+  return e.status === 401 || e.status === 403
+}
+
 export function describeApiError(e: unknown): string {
   if (e instanceof ApiHttpError) {
+    if (e.status === 401 || e.status === 403) {
+      console.warn('[API acceso]', e.status, e.payload?.codigo ?? '', e.payload?.mensaje ?? e.message)
+      return 'Credencial inválida. Verifica la clave en la sección Credenciales.'
+    }
     const code = e.payload?.codigo ? `${e.payload.codigo} · ` : ''
     const detail = e.payload?.mensaje ?? e.message
     if (

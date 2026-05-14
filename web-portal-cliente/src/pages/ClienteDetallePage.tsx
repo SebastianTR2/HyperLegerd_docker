@@ -1,0 +1,275 @@
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { consultarClienteDesdeApi, darBajaClienteDesdeApi } from '../services/clientesApi'
+import type { ClienteDetalleDto } from '../types/dto'
+import { ApiHttpError } from '../services/apiClient'
+import {
+  logTechnicalApiFailure,
+  mensajeClienteNoEncontrado,
+} from '../lib/apiErrors'
+import { AccesoServicioBloqueado, ServicioNoConfigurado } from '../components/PortalServiceMessages'
+import { Card, Button, Badge, Modal } from '../components/ui'
+import { formatDisplayDate } from '../lib/formatDate'
+import { logClienteBaja, logConsultaCliente, useSessionLog } from '../context/SessionLogContext'
+import { useSettings } from '../context/SettingsContext'
+import { esSoloLectura } from '../lib/roleFromKey'
+import { esClienteBajaLogica } from '../lib/mappers'
+
+export default function ClienteDetallePage() {
+  const { clienteId: rawId } = useParams()
+  const clienteId = rawId ? decodeURIComponent(rawId) : ''
+  const [search] = useSearchParams()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const queryStr = search.toString()
+  const [data, setData] = useState<ClienteDetalleDto | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
+  const [accessBlocked, setAccessBlocked] = useState(false)
+  const [confirmBaja, setConfirmBaja] = useState(false)
+  const [bajaSubmitting, setBajaSubmitting] = useState(false)
+  const [bajaError, setBajaError] = useState<string | null>(null)
+  const [flash, setFlash] = useState<string | null>(null)
+  const log = useSessionLog()
+  const { apiKey, isServiceConfigured } = useSettings()
+  const readOnly = esSoloLectura(apiKey)
+
+  useEffect(() => {
+    const st = location.state as { flashCliente?: string } | null
+    if (st?.flashCliente) {
+      setFlash(st.flashCliente)
+      navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: {} })
+    }
+  }, [location.pathname, location.search, location.state, navigate])
+
+  useEffect(() => {
+    const sp = new URLSearchParams(queryStr)
+    if (sp.get('intent') !== 'baja') return
+    setConfirmBaja(true)
+    sp.delete('intent')
+    const qs = sp.toString()
+    navigate({ pathname: `/clientes/${encodeURIComponent(clienteId)}`, search: qs ? `?${qs}` : '' }, { replace: true })
+  }, [clienteId, navigate, queryStr])
+
+  function recargarDetalle() {
+    if (!clienteId || !isServiceConfigured) return
+    consultarClienteDesdeApi(clienteId)
+      .then((d) => {
+        if (d) {
+          setData(d)
+          logConsultaCliente(log, true, clienteId)
+        } else {
+          setNotFound(true)
+        }
+      })
+      .catch((e: unknown) => {
+        if (e instanceof ApiHttpError && e.status === 404) {
+          setNotFound(true)
+        }
+      })
+  }
+
+  useEffect(() => {
+    if (!clienteId) return
+    if (!isServiceConfigured) {
+      setLoading(false)
+      setData(null)
+      setNotFound(false)
+      setAccessBlocked(false)
+      return
+    }
+    let ok = true
+    setLoading(true)
+    setNotFound(false)
+    setAccessBlocked(false)
+    consultarClienteDesdeApi(clienteId)
+      .then((d) => {
+        if (!ok) return
+        if (d) {
+          setData(d)
+          logConsultaCliente(log, true, clienteId)
+        } else {
+          setNotFound(true)
+          logConsultaCliente(log, false, clienteId)
+        }
+      })
+      .catch((e: unknown) => {
+        if (!ok) return
+        if (e instanceof ApiHttpError && (e.status === 401 || e.status === 403)) {
+          logTechnicalApiFailure('clientes.detalle', e)
+          setAccessBlocked(true)
+          return
+        }
+        if (e instanceof ApiHttpError && e.status === 404) {
+          setNotFound(true)
+          logConsultaCliente(log, false, clienteId)
+        } else {
+          setNotFound(true)
+        }
+      })
+      .finally(() => {
+        if (ok) setLoading(false)
+      })
+    return () => {
+      ok = false
+    }
+  }, [clienteId, isServiceConfigured])
+
+  if (!clienteId) {
+    return <p className="text-sm text-[#6B7280]">Indique un código de cliente válido.</p>
+  }
+
+  if (!isServiceConfigured) {
+    return (
+      <div className="mx-auto max-w-lg space-y-4">
+        <ServicioNoConfigurado />
+        <Link className="text-sm text-[#D97706] hover:underline" to="/clientes">
+          Volver al listado
+        </Link>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return <p className="text-sm text-[#6B7280]">Cargando…</p>
+  }
+
+  if (accessBlocked) {
+    return (
+      <div className="mx-auto max-w-lg space-y-4">
+        <AccesoServicioBloqueado />
+        <Link className="text-sm text-[#D97706] hover:underline" to="/clientes">
+          Volver al listado
+        </Link>
+      </div>
+    )
+  }
+
+  if (notFound || !data) {
+    return (
+      <div className="mx-auto max-w-lg">
+        <Card title="Consulta">
+          <p className="text-sm text-[#6B7280]">{mensajeClienteNoEncontrado()}</p>
+          <Link className="mt-4 inline-block text-sm text-[#D97706] hover:underline" to="/clientes">
+            Volver al listado
+          </Link>
+        </Card>
+      </div>
+    )
+  }
+
+  const esBaja = esClienteBajaLogica({ estadoCodigo: data.estadoCodigo, notas: data.notas })
+  const badgeTone =
+    data.estadoCodigo === 'ACTIVO' ? 'success' : esBaja ? 'danger' : 'neutral'
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      {flash ? (
+        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          {flash}
+        </div>
+      ) : null}
+
+      <Card title="Ficha del cliente">
+        <dl className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Código</dt>
+            <dd className="mt-1 font-mono text-sm text-[#1F2937]">{data.codigo}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Estado</dt>
+            <dd className="mt-1">
+              <Badge tone={badgeTone}>{data.estadoEtiqueta}</Badge>
+            </dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Nombre</dt>
+            <dd className="mt-1 text-sm text-[#1F2937]">{data.nombre}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Documento</dt>
+            <dd className="mt-1 text-sm text-[#1F2937]">
+              {data.tipoDocumento} {data.numeroDocumento}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Fecha de registro</dt>
+            <dd className="mt-1 text-sm text-[#1F2937]">{formatDisplayDate(data.fechaAlta)}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Teléfono</dt>
+            <dd className="mt-1 text-sm text-[#1F2937]">{data.telefono || '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Correo</dt>
+            <dd className="mt-1 text-sm text-[#1F2937]">{data.correo || '—'}</dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Notas</dt>
+            <dd className="mt-1 text-sm text-[#6B7280]">{data.notas || '—'}</dd>
+          </div>
+        </dl>
+
+        <div className="mt-6 flex flex-wrap gap-2 border-t border-[#E8E1D8] pt-4">
+          <Link to="/clientes">
+            <Button variant="secondary">Volver</Button>
+          </Link>
+          <Link to={`/clientes/${encodeURIComponent(data.codigo)}/editar`}>
+            <Button disabled={readOnly || esBaja}>Editar</Button>
+          </Link>
+          <Button variant="secondary" disabled={readOnly || esBaja} onClick={() => setConfirmBaja(true)}>
+            Dar de baja
+          </Button>
+        </div>
+      </Card>
+
+      <Modal
+        open={confirmBaja}
+        title="Dar de baja"
+        onClose={() => {
+          if (!bajaSubmitting) {
+            setConfirmBaja(false)
+            setBajaError(null)
+          }
+        }}
+        footer={
+          <>
+            <Button variant="secondary" disabled={bajaSubmitting} onClick={() => setConfirmBaja(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="danger"
+              loading={bajaSubmitting}
+              onClick={async () => {
+                setBajaError(null)
+                setBajaSubmitting(true)
+                try {
+                  await darBajaClienteDesdeApi(data.codigo)
+                  setConfirmBaja(false)
+                  setFlash('Cliente dado de baja correctamente.')
+                  logClienteBaja(log, data.codigo)
+                  recargarDetalle()
+                } catch (e: unknown) {
+                  logTechnicalApiFailure('clientes.baja', e)
+                  if (e instanceof ApiHttpError && e.payload?.mensaje) {
+                    setBajaError(e.payload.mensaje)
+                  } else {
+                    setBajaError('No se pudo completar la baja. Intente nuevamente.')
+                  }
+                } finally {
+                  setBajaSubmitting(false)
+                }
+              }}
+            >
+              Confirmar baja
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-[#1F2937]">¿Deseas dar de baja este cliente?</p>
+        <p className="mt-2 text-sm text-[#6B7280]">Esta acción quedará registrada.</p>
+        {bajaError ? <p className="mt-3 text-sm text-red-800">{bajaError}</p> : null}
+      </Modal>
+    </div>
+  )
+}

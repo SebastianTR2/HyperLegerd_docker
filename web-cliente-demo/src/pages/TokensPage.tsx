@@ -551,7 +551,7 @@ export default function TokensPage() {
           <ul className="mt-2 space-y-1 text-xs text-muted">
             <li>- Consultar clientes y revisar historial.</li>
             <li>- Revisar trazabilidad de operaciones y TXID existentes.</li>
-            <li>- Registrar clientes (solo si tu rol lo permite en Registros).</li>
+            <li>- Alta de clientes desde el Portal de Cliente (según permisos de su clave).</li>
           </ul>
         </div>
       </div>

@@ -6,6 +6,24 @@ export async function fetchHistorialCliente(clienteId: string): Promise<Historia
   return apiJson<HistorialClienteApi>(`/clientes/historial/${id}`, { method: 'GET' })
 }
 
+export type AccionLineaTiempo = {
+  tipo: 'creado' | 'editado' | 'baja'
+  etiqueta: string
+  fecha: string
+  txId: string
+}
+
+export type LineaTiempoRespuesta = {
+  ok: boolean
+  clienteId: string
+  acciones: AccionLineaTiempo[]
+}
+
+export async function fetchLineaTiempoCliente(clienteId: string): Promise<LineaTiempoRespuesta> {
+  const id = encodeURIComponent(clienteId.trim())
+  return apiJson<LineaTiempoRespuesta>(`/clientes/historial-resumido/${id}`, { method: 'GET' })
+}
+
 export type HistorialFilaVista = {
   txId: string
   timestamp: string
@@ -15,7 +33,12 @@ export type HistorialFilaVista = {
 }
 
 export function operacionesAVista(h: HistorialClienteApi): HistorialFilaVista[] {
-  return h.operaciones.map((op) => {
+  // El chaincode devuelve más reciente primero. Ordenamos ascendente para que
+  // rows[0] sea la creación original y rows[i-1] sea la versión anterior real.
+  const ordenadas = [...h.operaciones].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  )
+  return ordenadas.map((op) => {
     const rec = op.record
     const resumen = rec
       ? `${rec.nombre ?? ''} (${rec.estado ?? ''})`.trim() || op.txId

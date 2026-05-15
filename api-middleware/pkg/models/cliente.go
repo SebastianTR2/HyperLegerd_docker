@@ -37,3 +37,18 @@ type HistorialCliente struct {
 	ClienteId   string                     `json:"clienteId"`
 	Operaciones []RegistroHistorialCliente `json:"operaciones"`
 }
+
+// LineaTiempoCliente representa la auditoría resumida del cliente.
+type LineaTiempoCliente struct {
+	Ok        bool                `json:"ok"`
+	ClienteId string              `json:"clienteId"`
+	Acciones  []AccionLineaTiempo `json:"acciones"`
+}
+
+// AccionLineaTiempo representa un hito en la vida del activo.
+type AccionLineaTiempo struct {
+	Tipo     string `json:"tipo"` // creado, editado, baja
+	Etiqueta string `json:"etiqueta"`
+	Fecha    string `json:"fecha"`
+	TxId     string `json:"txId"`
+}

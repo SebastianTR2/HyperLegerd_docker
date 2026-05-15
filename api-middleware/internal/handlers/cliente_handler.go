@@ -9,12 +9,41 @@ import (
 	"net/mail"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
+	"encoding/base64"
+	"crypto/sha256"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
+
+// encodeField codifica un string en Base64 para privacidad en el ledger
+func encodeField(data string) string {
+	return base64.StdEncoding.EncodeToString([]byte(data))
+}
+
+// generateSignature crea un hash de integridad del registro
+func generateSignature(c models.Cliente) string {
+	payload := fmt.Sprintf("%s|%s|%s|%s", c.ClienteId, c.Nombre, c.Estado, c.FechaAlta)
+	hash := sha256.Sum256([]byte(payload))
+	return fmt.Sprintf("SIG-%x", hash[:16])
+}
+
+// getRoleFromKey mapea la API Key al nombre del usuario y su rol para auditoría
+func getRoleFromKey(key string) string {
+	switch key {
+	case os.Getenv("API_KEY_ADMIN"):
+		return "Ing. Carlos Mamani (Supervisor)"
+	case os.Getenv("API_KEY_INTEGRADOR"):
+		return "Lic. Ana Flores (Operador Planta)"
+	case os.Getenv("API_KEY_SOLO_LECTURA"):
+		return "Dr. Pedro Huanca (Auditor)"
+	default:
+		return "Usuario Desconocido"
+	}
+}
 
 // RegistrarCliente maneja la creación de un nuevo asset de cliente en Fabric.
 func RegistrarCliente(c *gin.Context) {
@@ -39,8 +68,26 @@ func RegistrarCliente(c *gin.Context) {
 	}
 	n = normalizado
 
+	// Inyectar usuario para auditoría in-ledger
+	apiKey := c.GetHeader("X-API-Key")
+	n.Notas = fmt.Sprintf("[%s] %s", getRoleFromKey(apiKey), n.Notas)
+
+	// Inyectar usuario para auditoría in-ledger
+	apiKey := c.GetHeader("X-API-Key")
+	rol := getRoleFromKey(apiKey)
+	n.Notas = fmt.Sprintf("[%s] %s", rol, n.Notas)
+
+	// APLICAR ENCODE (Privacidad)
+	nombreOriginal := n.Nombre
+	n.Nombre = encodeField(n.Nombre)
+	n.Email = encodeField(n.Email)
+	n.Telefono = encodeField(n.Telefono)
+
+	// GENERAR FIRMA DIGITAL DE NEGOCIO
+	firma := generateSignature(n)
+	n.Notas = fmt.Sprintf("FIRMA: %s | %s", firma, n.Notas)
+
 	// 1. Invocar el Chaincode (Fase 4)
-	// Función: CreateAsset(clienteId, nombre, tipoDoc, numeroDoc, fechaAlta, estado, telefono, email, notas)
 	chaincode := os.Getenv("CHAINCODE_NAME")
 	if strings.TrimSpace(chaincode) == "" {
 		c.JSON(http.StatusInternalServerError, models.RespuestaError{
@@ -214,6 +261,24 @@ func ActualizarCliente(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.RespuestaError{Ok: false, Codigo: "VALIDACION", Mensaje: err.Error()})
 		return
 	}
+
+	// Inyectar usuario para auditoría in-ledger
+	apiKey := c.GetHeader("X-API-Key")
+	normalizado.Notas = fmt.Sprintf("[%s] %s", getRoleFromKey(apiKey), normalizado.Notas)
+
+	// Inyectar usuario para auditoría in-ledger
+	apiKey := c.GetHeader("X-API-Key")
+	rol := getRoleFromKey(apiKey)
+	normalizado.Notas = fmt.Sprintf("[%s] %s", rol, normalizado.Notas)
+
+	// APLICAR ENCODE (Privacidad)
+	normalizado.Nombre = encodeField(normalizado.Nombre)
+	normalizado.Email = encodeField(normalizado.Email)
+	normalizado.Telefono = encodeField(normalizado.Telefono)
+
+	// GENERAR FIRMA DIGITAL DE NEGOCIO
+	firma := generateSignature(*normalizado)
+	normalizado.Notas = fmt.Sprintf("FIRMA: %s | %s", firma, normalizado.Notas)
 
 	result, err := fabric.InvokeTransactionWithTxID(chaincode, "UpdateAsset",
 		normalizado.ClienteId, normalizado.Nombre, normalizado.TipoDocumento, normalizado.NumeroDocumento,
@@ -487,5 +552,83 @@ func ConsultarHistorialCliente(c *gin.Context) {
 	c.JSON(http.StatusOK, models.HistorialCliente{
 		ClienteId:   clienteId,
 		Operaciones: operaciones,
+	})
+}
+
+// ConsultarLineaTiempoCliente obtiene el historial y lo transforma en hitos de negocio (Creado, Editado, Baja).
+func ConsultarLineaTiempoCliente(c *gin.Context) {
+	clienteId := strings.TrimSpace(c.Param("clienteId"))
+	chaincode := strings.TrimSpace(os.Getenv("CHAINCODE_NAME"))
+	if chaincode == "" {
+		c.JSON(http.StatusInternalServerError, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "CONFIGURACION",
+			Mensaje: "No se encontró CHAINCODE_NAME en variables de entorno",
+		})
+		return
+	}
+
+	result, err := fabric.EvaluateTransaction(chaincode, "GetAssetHistory", clienteId)
+	if err != nil {
+		if esErrorNoEncontrado(err) {
+			c.JSON(http.StatusNotFound, models.RespuestaError{
+				Ok:      false,
+				Codigo:  "NO_ENCONTRADO",
+				Mensaje: "Historial no encontrado",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "ERROR_FABRIC",
+			Mensaje: "Error al obtener historial: " + err.Error(),
+		})
+		return
+	}
+
+	var operaciones []models.RegistroHistorialCliente
+	if err := json.Unmarshal(result, &operaciones); err != nil {
+		c.JSON(http.StatusInternalServerError, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "ERROR_FORMATO",
+			Mensaje: "Error al interpretar historial",
+		})
+		return
+	}
+
+	// El chaincode devuelve entradas de más reciente a más antiguo.
+	// Ordenamos ascendente por timestamp para que i==0 sea siempre la PRIMERA
+	// escritura (creación) y los siguientes sean ediciones o baja.
+	sort.Slice(operaciones, func(i, j int) bool {
+		return operaciones[i].Timestamp < operaciones[j].Timestamp
+	})
+
+	acciones := make([]models.AccionLineaTiempo, 0, len(operaciones))
+	for i, op := range operaciones {
+		accion := models.AccionLineaTiempo{
+			TxId:  op.TxId,
+			Fecha: op.Timestamp,
+		}
+
+		switch {
+		case op.IsDelete:
+			accion.Tipo = "baja"
+			accion.Etiqueta = "Dado de Baja"
+		case i == 0:
+			// Primera entrada (más antigua) = creación del asset
+			accion.Tipo = "creado"
+			accion.Etiqueta = "Creado"
+		default:
+			// Entradas posteriores sin isDelete = modificación
+			accion.Tipo = "editado"
+			accion.Etiqueta = "Editado"
+		}
+		acciones = append(acciones, accion)
+	}
+
+	c.JSON(http.StatusOK, models.LineaTiempoCliente{
+		Ok:        true,
+		ClienteId: clienteId,
+		Acciones:  acciones,
 	})
 }

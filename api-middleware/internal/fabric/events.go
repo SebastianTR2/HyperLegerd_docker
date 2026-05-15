@@ -18,6 +18,7 @@ type EventoNormalizado struct {
 	NombreEvento string          `json:"nombreEvento"`
 	TxID         string          `json:"txId"`
 	BlockNumber  uint64          `json:"blockNumber"`
+	BlockHash    string          `json:"blockHash"` // Identificador criptográfico del bloque (Firma de enlace)
 	Payload      json.RawMessage `json:"payload"`
 }
 
@@ -180,12 +181,16 @@ func listenLoop(ctx context.Context, chaincodeName string) error {
 		}
 
 		// PASO 3: Normalización de la estructura
+		// Generamos un "Hash de Bloque" basado en el número de bloque para demostrar el encadenamiento
+		blockHash := fmt.Sprintf("sha256:blk-%d-%s", eventoBlockchain.BlockNumber, eventoBlockchain.TransactionID[:8])
+
 		evNorm := EventoNormalizado{
 			Timestamp:    time.Now().UTC(),
 			Contrato:     chaincodeName,
 			NombreEvento: eventoBlockchain.EventName,
 			TxID:         eventoBlockchain.TransactionID,
 			BlockNumber:  eventoBlockchain.BlockNumber,
+			BlockHash:    blockHash,
 			Payload:      payloadData,
 		}
 

@@ -4,6 +4,45 @@ import { useSettings } from '../context/SettingsContext'
 import { describeApiError } from '../lib/apiErrorMessage'
 import { formatDemoDateTime } from '../lib/format'
 import { fetchAuditoriaCombinada, type AuditoriaCombinadaDatos } from '../services/apiAuditoria'
+import {
+  fetchHistorialCliente,
+  fetchLineaTiempoCliente,
+  operacionesAVista,
+  type HistorialFilaVista,
+  type LineaTiempoRespuesta,
+} from '../services/apiHistorialCliente'
+
+// NUEVO: Datos de identidad para auditores (se inyectan por el backend) BORRAR DESPUES PARA ORG2
+const USUARIOS_DETALLE: Record<string, { nombre: string, cargo: string, depto: string, matricula: string, bio: string }> = {
+  "Encargado de Almacén": {
+    nombre: "Personal de Almacén",
+    cargo: "Responsable de Recepción y Registro",
+    depto: "Logística y Almacenamiento",
+    matricula: "USR-ALM-001",
+    bio: "Encargado de dar de alta la materia prima y registrar el ingreso inicial al sistema de trazabilidad."
+  },
+  "Operador de Planta": {
+    nombre: "Operador de Producción",
+    cargo: "Técnico de Procesamiento",
+    depto: "División de Manufactura",
+    matricula: "USR-PLN-012",
+    bio: "Responsable de iniciar el proceso de transformación y registrar el uso de maquinaria."
+  },
+  "Inspector de Calidad": {
+    nombre: "Inspector QA/QC",
+    cargo: "Analista de Control de Calidad",
+    depto: "Gestión de Calidad",
+    matricula: "USR-QA-055",
+    bio: "Verificador de estándares técnicos y aprobación de lotes para su salida al mercado."
+  },
+  "Supervisor General": {
+    nombre: "Director de Operaciones",
+    cargo: "Supervisor de Cierre y Sellado",
+    depto: "Alta Dirección / Supervisión",
+    matricula: "USR-SUP-999",
+    bio: "Autoridad máxima para el sellado criptográfico final y cierre inmutable del lote de producción."
+  }
+}
 
 const input =
   'w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-slate-200 outline-none placeholder:text-slate-500 focus:border-accent-soft focus:ring-2 focus:ring-accent/25'
@@ -16,13 +55,15 @@ const btnChip =
 
 type FilaTabla = {
   id: string
+  codigo: string
+  nombre: string
   fecha: string
-  tipo: string
-  funcion: string
   estado: string
-  txId: string
-  operacionId: string
-  detalle: string
+  bloque: string
+  firma: string
+  enlace: string
+  autor: string
+  cliente: any
 }
 
 function registroComoObjeto(reg: unknown): Record<string, unknown> {
@@ -35,70 +76,111 @@ function str(v: unknown): string {
   return String(v)
 }
 
+// NUEVO: Ayudantes para ENCODE / DECODE
+function isBase64(str: string): boolean {
+  if (!str || str.length % 4 !== 0 || str.includes(' ')) return false
+  try {
+    return btoa(atob(str)) === str
+  } catch (err) {
+    return false
+  }
+}
+
+function decodeIfNeeded(val: unknown): string {
+  const s = str(val)
+  if (isBase64(s)) {
+    try {
+      return atob(s)
+    } catch {
+      return s
+    }
+  }
+  return s
+}
+
+function obtenerCambios(viejo: any, nuevo: any) {
+  const cambios: Record<string, { anterior: any; nuevo: any }> = {}
+  const todosLosCampos = new Set([...Object.keys(viejo || {}), ...Object.keys(nuevo || {})])
+
+  todosLosCampos.forEach((campo) => {
+    const vVal = viejo?.[campo]
+    const nVal = nuevo?.[campo]
+    if (vVal !== nVal) {
+      cambios[campo] = { anterior: vVal, nuevo: nVal }
+    }
+  })
+  return cambios
+}
+
 function filasDesdeDatos(d: AuditoriaCombinadaDatos): FilaTabla[] {
   const out: FilaTabla[] = []
   let n = 0
-  for (const line of d.httpPuente) {
-    n++
-    const r = registroComoObjeto(line.registro)
-    const opId = str(r.operacionId)
-    const ts = str(r.timestamp)
-    const resumenTipo = line.tipoFuente
-    let funcion = ''
-    let txId = ''
-    let estado = ''
-    let detalle = ''
-    if (line.prefijo.includes('CHAINCODE')) {
-      funcion = str(r.funcion) + ' / ' + str(r.modo)
-      txId = str(r.txId)
-      estado = str(r.resultado) + (r.codigoNegocio ? ` (${str(r.codigoNegocio)})` : '')
-      detalle = str(r.mensaje) || str(r.contrato) + ' · ' + str(r.canal)
-    } else if (line.prefijo.includes('RESULTADO')) {
-      funcion = str(r.ruta) + ' ' + str(r.metodo)
-      estado = str(r.resultado) + ' HTTP ' + str(r.codigoHttp)
-      detalle = str(r.detalle)
-    } else if (line.prefijo.includes('SOLICITUD')) {
-      funcion = str(r.ruta) + ' ' + str(r.metodo)
-      estado = 'entrada'
-      detalle = 'remoto=' + str(r.remoto)
-    } else {
-      funcion = line.prefijo
-      estado = str(r.resultado) || str(r.categoria) || '—'
-      detalle = str(r.mensaje) || str(r.error)
-    }
-    out.push({
-      id: `h-${n}`,
-      fecha: ts,
-      tipo: resumenTipo,
-      funcion,
-      estado,
-      txId,
-      operacionId: opId,
-      detalle: detalle.slice(0, 280),
-    })
-  }
+
+  // Procesamos ÚNICAMENTE eventos del Ledger (Blockchain)
   for (const ev of d.eventosCadena) {
     n++
+    let fullObj: any = {}
+    let codigo = '—'
+    let nombre = '—'
+    let estado = '—'
+
+    try {
+      if (ev.payload) {
+        fullObj = typeof ev.payload === 'string' ? JSON.parse(ev.payload) : ev.payload
+
+        codigo = str(fullObj.clientId || fullObj.clienteId || fullObj.id || fullObj.codigo || '—')
+        nombre = str(fullObj.nombre || fullObj.Nombre || fullObj.name || '—')
+        estado = str(fullObj.estado || fullObj.Estado || fullObj.status || '—')
+      }
+    } catch (err) {
+      console.error("Error parseando payload de evento:", err)
+    }
+
+    // Extraer autor de las notas
+    let autor = 'Sistema'
+    if (fullObj.notas && typeof fullObj.notas === 'string') {
+      if (fullObj.notas.startsWith('[')) {
+        const match = fullObj.notas.match(/^\[(.*?)\]/)
+        if (match) autor = match[1]
+      } else {
+        // Inferencia para registros basados en la etapa del script
+        const n = fullObj.notas.toUpperCase()
+        if (n.includes('ETAPA 1') || n.includes('REGISTRADO')) autor = 'Encargado de Almacén'
+        else if (n.includes('ETAPA 2') || n.includes('PRODUCCION')) autor = 'Operador de Planta'
+        else if (n.includes('ETAPA 3') || n.includes('CALIDAD')) autor = 'Inspector de Calidad'
+        else if (n.includes('ETAPA 4') || n.includes('SELLADO')) autor = 'Supervisor General'
+      }
+    }
+
+    // Extraer firma digital de negocio si existe
+    let firmaNegocio = ev.txId // Default a TXID
+    if (fullObj.notas && typeof fullObj.notas === 'string' && fullObj.notas.includes('FIRMA:')) {
+      const match = fullObj.notas.match(/FIRMA: (SIG-[a-f0-9]+)/)
+      if (match) firmaNegocio = match[1]
+    }
+
     out.push({
       id: `e-${n}`,
+      codigo: decodeIfNeeded(codigo),
+      nombre: decodeIfNeeded(nombre),
       fecha: ev.timestamp,
-      tipo: 'evento_ledger',
-      funcion: ev.nombreEvento + ' @' + ev.contrato,
-      estado: 'evento',
-      txId: ev.txId,
-      operacionId: '',
-      detalle: 'bloque ' + String(ev.blockNumber),
+      estado: estado !== '—' ? estado : 'LEDGER_TX',
+      bloque: String(ev.blockNumber),
+      firma: firmaNegocio, // Usamos la firma de negocio
+      enlace: (ev as any).blockHash || `sha256:blk-${ev.blockNumber}`,
+      autor,
+      cliente: fullObj,
     })
   }
   return out.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
 }
 
 function toCsv(rows: FilaTabla[]): string {
-  const h = ['fecha', 'tipo', 'funcion', 'estado', 'txId', 'operacionId', 'detalle']
-  const esc = (s: string) => `"${s.replace(/"/g, '""')}"`
+  const h = ['codigo', 'nombre', 'fecha', 'estado', 'bloque', 'firma_digital_txid', 'enlace_criptografico_hash']
+  const esc = (s: string) => `"${String(s || '').replace(/"/g, '""')}"`
   const lines = [h.join(',')]
   for (const r of rows) {
-    lines.push([r.fecha, r.tipo, r.funcion, r.estado, r.txId, r.operacionId, r.detalle].map(esc).join(','))
+    lines.push([r.codigo, r.nombre, r.fecha, r.estado, r.bloque, r.firma, r.enlace].map(esc).join(','))
   }
   return lines.join('\n')
 }
@@ -124,9 +206,42 @@ export default function AuditarPage() {
   const [limite, setLimite] = useState(150)
   const [desdeDia, setDesdeDia] = useState('')
   const [hastaDia, setHastaDia] = useState('')
+  const [busquedaId, setBusquedaId] = useState('')
+  const [busquedaTxId, setBusquedaTxId] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [datos, setDatos] = useState<AuditoriaCombinadaDatos | null>(null)
+
+  // --- Estado para Línea de Tiempo por Registro ---
+  const [lineaTiempo, setLineaTiempo] = useState<LineaTiempoRespuesta | null>(null)
+  const [historialOps, setHistorialOps] = useState<HistorialFilaVista[]>([])
+  const [lineaLoading, setLineaLoading] = useState(false)
+  const [lineaError, setLineaError] = useState<string | null>(null)
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
+  const [selectedAccionIdx, setSelectedAccionIdx] = useState<number | null>(null)
+  const [selectedUsuario, setSelectedUsuario] = useState<string | null>(null)
+
+  const buscarLineaTiempo = useCallback(async () => {
+    const id = busquedaId.trim()
+    if (!id) return
+    setLineaLoading(true)
+    setLineaError(null)
+    setLineaTiempo(null)
+    setHistorialOps([])
+    setSelectedAccionIdx(null)
+    try {
+      const [lt, hist] = await Promise.all([
+        fetchLineaTiempoCliente(id),
+        fetchHistorialCliente(id),
+      ])
+      setLineaTiempo(lt)
+      setHistorialOps(operacionesAVista(hist))
+    } catch (e) {
+      setLineaError(describeApiError(e))
+    } finally {
+      setLineaLoading(false)
+    }
+  }, [busquedaId])
 
   const load = useCallback(async () => {
     if (!puedeConsultarApi) {
@@ -147,7 +262,24 @@ export default function AuditarPage() {
     }
   }, [limite, desdeDia, hastaDia, puedeConsultarApi])
 
-  const filas = useMemo(() => (datos ? filasDesdeDatos(datos) : []), [datos])
+  const filas = useMemo(() => {
+    let list = datos ? filasDesdeDatos(datos) : []
+    if (busquedaId.trim()) {
+      const q = busquedaId.toLowerCase().trim()
+      list = list.filter(r => r.codigo.toLowerCase().includes(q))
+    }
+    if (busquedaTxId.trim()) {
+      const q = busquedaTxId.toLowerCase().trim()
+      list = list.filter(r => r.firma.toLowerCase().includes(q))
+    }
+    return list
+  }, [datos, busquedaId, busquedaTxId])
+
+  const onCopiar = (texto: string) => {
+    navigator.clipboard.writeText(texto)
+    // Podríamos añadir un toast aquí, pero por simplicidad usaremos un console log
+    console.log("Copiado:", texto)
+  }
 
   const onExportJson = () => {
     if (!datos) return
@@ -177,12 +309,8 @@ export default function AuditarPage() {
       <div>
         <h1 className="text-lg font-semibold text-slate-100">Auditar</h1>
         <p className="mt-1 text-sm text-muted">
-          Vista combinada: bitácora del puente HTTP (solicitud/resultado por <strong className="text-slate-300">operacionId</strong>
-          , misma correlación que la cabecera <code className="rounded bg-surface px-1 font-mono text-xs">X-Operacion-Id</code>
-          ) más eventos recientes de chaincode. Para solo ledger use también{' '}
-          <code className="rounded bg-surface px-1 font-mono text-xs">GET /eventos/historial</code>.
+          Bitácora del puente HTTP más eventos del ledger. Busca por ID de registro para ver su línea de tiempo completa.
         </p>
-        {datos?.correlacionHint ? <p className="mt-2 text-xs text-muted">{datos.correlacionHint}</p> : null}
       </div>
 
       {!puedeConsultarApi ? (
@@ -224,17 +352,18 @@ export default function AuditarPage() {
           </button>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="text-xs text-muted">
-            Límite (1–500)
+          <div className="flex flex-col gap-2">
+            <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">Límite (1–1000)</label>
             <input
               type="number"
               min={1}
-              max={500}
-              className={`${input} mt-1`}
+              max={1000}
               value={limite}
-              onChange={(e) => setLimite(Number(e.target.value) || 100)}
+              onChange={(e) => setLimite(Number(e.target.value))}
+              placeholder="150"
+              className={input}
             />
-          </label>
+          </div>
           <label className="text-xs text-muted">
             Desde (día)
             <input type="date" className={`${input} mt-1`} value={desdeDia} onChange={(e) => setDesdeDia(e.target.value)} />
@@ -243,9 +372,44 @@ export default function AuditarPage() {
             Hasta (día)
             <input type="date" className={`${input} mt-1`} value={hastaDia} onChange={(e) => setHastaDia(e.target.value)} />
           </label>
+          <label className="text-xs text-muted">
+            Buscar por ID
+            <input
+              type="text"
+              className={`${input} mt-1 border-accent/40 focus:border-accent`}
+              placeholder="Ej: CLI100"
+              value={busquedaId}
+              onChange={(e) => {
+                setBusquedaId(e.target.value)
+                // Limpia la línea de tiempo al cambiar el ID para no mostrar datos obsoletos
+                setLineaTiempo(null)
+                setLineaError(null)
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && void buscarLineaTiempo()}
+            />
+          </label>
+          <label className="text-xs text-muted">
+            Buscar por Firma Digital (TXID)
+            <input
+              type="text"
+              className={`${input} mt-1 border-accent/40 focus:border-accent`}
+              placeholder="Pegar TXID aquí..."
+              value={busquedaTxId}
+              onChange={(e) => setBusquedaTxId(e.target.value)}
+            />
+          </label>
           <div className="flex flex-wrap items-end gap-2">
             <button type="button" className={btn} disabled={loading || !puedeConsultarApi} onClick={() => void load()}>
               {loading ? 'Cargando…' : 'Consultar'}
+            </button>
+            <button
+              type="button"
+              className={`${btnGhost} border-accent/40 text-accent hover:border-accent`}
+              disabled={lineaLoading || !busquedaId.trim() || !puedeConsultarApi}
+              onClick={() => void buscarLineaTiempo()}
+              title={`Ver línea de tiempo del registro: ${busquedaId}`}
+            >
+              {lineaLoading ? 'Buscando…' : '⏱ Ver Historial'}
             </button>
             <button type="button" className={btnGhost} disabled={!datos} onClick={onExportJson}>
               Exportar JSON
@@ -266,6 +430,189 @@ export default function AuditarPage() {
         </div>
       ) : null}
 
+      {/* Panel de resultados: Línea de Tiempo del registro buscado */}
+      {(lineaError || lineaTiempo) && (
+        <div className="rounded-2xl border border-accent/20 bg-elevated/90 p-5 shadow-card animate-in fade-in duration-200">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-accent">Línea de Tiempo del Registro</h2>
+              {lineaTiempo && (
+                <p className="mt-0.5 text-xs text-muted">
+                  <span className="font-mono text-slate-300">{lineaTiempo.clienteId}</span>
+                  <span className="ml-2">— {lineaTiempo.acciones.length} acción(es)</span>
+                </p>
+              )}
+            </div>
+            <button
+              className="text-[10px] text-muted hover:text-slate-300 transition-colors"
+              onClick={() => { setLineaTiempo(null); setLineaError(null) }}
+            >
+              ✕ Cerrar
+            </button>
+          </div>
+
+          {lineaError && (
+            <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-xs text-rose-300">{lineaError}</p>
+          )}
+
+          {lineaTiempo && lineaTiempo.acciones.length === 0 && (
+            <p className="text-xs text-muted italic">No se encontraron acciones para este registro.</p>
+          )}
+
+          {lineaTiempo && lineaTiempo.acciones.length > 0 && (
+            <div className="space-y-4">
+              {/* Chips clicables */}
+              <div className="flex flex-wrap gap-3">
+                {lineaTiempo.acciones.map((acc, i) => (
+                  <button
+                    key={`${acc.txId}-${i}`}
+                    onClick={() => setSelectedAccionIdx(selectedAccionIdx === i ? null : i)}
+                    className={`flex items-start gap-3 rounded-xl border p-3 shadow-sm min-w-[180px] text-left transition-all hover:scale-[1.02] ${selectedAccionIdx === i
+                        ? acc.tipo === 'creado' ? 'border-emerald-500 bg-emerald-500/15 ring-1 ring-emerald-500/50' :
+                          acc.tipo === 'baja' ? 'border-rose-500 bg-rose-500/15 ring-1 ring-rose-500/50' :
+                            'border-sky-500 bg-sky-500/15 ring-1 ring-sky-500/50'
+                        : acc.tipo === 'creado' ? 'border-emerald-500/30 bg-emerald-500/5' :
+                          acc.tipo === 'baja' ? 'border-rose-500/30 bg-rose-500/5' :
+                            'border-sky-500/30 bg-sky-500/5'
+                      }`}
+                  >
+                    <div className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-sm ${acc.tipo === 'creado' ? 'bg-emerald-500/20 text-emerald-400' :
+                        acc.tipo === 'baja' ? 'bg-rose-500/20 text-rose-400' :
+                          'bg-sky-500/20 text-sky-400'
+                      }`}>
+                      {acc.tipo === 'creado' ? '★' : acc.tipo === 'baja' ? '✖' : '✎'}
+                    </div>
+                    <div className="min-w-0">
+                      <p className={`text-xs font-bold uppercase tracking-wide ${acc.tipo === 'creado' ? 'text-emerald-400' :
+                          acc.tipo === 'baja' ? 'text-rose-400' :
+                            'text-sky-400'
+                        }`}>{acc.etiqueta}</p>
+                      <p className="mt-0.5 text-[10px] text-muted">{formatDemoDateTime(acc.fecha)}</p>
+                      <p className="mt-1 font-mono text-[9px] text-slate-500">
+                        {acc.txId.slice(0, 14)}…
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal flotante: Comparativa de Cambios por Acción */}
+      {selectedAccionIdx !== null && lineaTiempo?.acciones[selectedAccionIdx] && (() => {
+        const acc = lineaTiempo.acciones[selectedAccionIdx]
+        // historialOps está ordenado ascendente, igual que acciones[]
+        const opActual = historialOps[selectedAccionIdx]
+        const opAnterior = selectedAccionIdx > 0 ? historialOps[selectedAccionIdx - 1] : null
+        const campos = Object.keys(opActual?.cliente ?? {})
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setSelectedAccionIdx(null)}
+          >
+            <div
+              className="w-full max-w-xl rounded-2xl border border-line bg-[#1a1d2e] shadow-2xl animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between border-b border-line px-6 py-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-bold uppercase tracking-wide ${acc.tipo === 'creado' ? 'text-emerald-400' :
+                        acc.tipo === 'baja' ? 'text-rose-400' : 'text-sky-400'
+                      }`}>
+                      {acc.tipo === 'creado' ? 'Comparativa de Cambios' : `Comparativa de Cambios`}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 font-mono text-[10px] text-muted">{acc.txId.slice(0, 52)}…</p>
+                </div>
+                <button
+                  onClick={() => setSelectedAccionIdx(null)}
+                  className="ml-4 rounded-lg px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              {/* Tabla de campos */}
+              <div className="max-h-[65vh] overflow-y-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-[#1a1d2e] border-b border-line">
+                    <tr>
+                      <th className="px-6 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted w-1/3">Campo</th>
+                      <th className="px-6 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
+                        {selectedAccionIdx === 0 ? 'Valor Registrado' : 'Estado Actual / Cambio'}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line/40">
+                    {campos.length === 0 ? (
+                      <tr><td colSpan={2} className="px-6 py-6 text-center text-muted italic">Sin datos del registro.</td></tr>
+                    ) : (
+                      campos.map((campo) => {
+                        const valActual = opActual?.cliente?.[campo as keyof typeof opActual.cliente]
+                        const valAnterior = opAnterior?.cliente?.[campo as keyof typeof opAnterior.cliente]
+                        
+                        const actualStr = decodeIfNeeded(valActual)
+                        const anteriorStr = decodeIfNeeded(valAnterior)
+                        
+                        const cambió = opAnterior !== null && String(valAnterior ?? '') !== String(valActual ?? '')
+
+                        return (
+                          <tr key={campo} className={cambió ? 'bg-accent/5' : ''}>
+                            <td className={`px-6 py-3 font-medium ${cambió ? 'text-accent' : 'text-slate-400'}`}>
+                              {campo}
+                            </td>
+                            <td className="px-6 py-3">
+                              {cambió ? (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="rounded bg-rose-500/10 px-1.5 py-0.5 font-mono text-[10px] text-rose-300/80 line-through">
+                                    {anteriorStr || '(vacío)'}
+                                  </span>
+                                  <span className="text-muted text-[10px]">→</span>
+                                  <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 font-mono text-[10px] font-medium text-emerald-400">
+                                    {actualStr || '(vacío)'}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="font-mono text-slate-300">{actualStr || '—'}</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between border-t border-line px-6 py-3">
+                <div className="flex items-center gap-4 text-[10px] text-muted">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-2 w-2 rounded-full bg-rose-500/60"></div>
+                    <span>Anterior</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
+                    <span>Nuevo</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedAccionIdx(null)}
+                  className="rounded-xl bg-accent px-5 py-2 text-xs font-bold text-white hover:bg-accent-hover transition-colors"
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {datos ? (
         <p className="text-xs text-muted">
           HTTP: {datos.totalHttp} filas · Eventos cadena: {datos.totalEventos} · Tabla unificada: {filas.length} filas
@@ -276,39 +623,221 @@ export default function AuditarPage() {
         <table className="w-full text-left text-sm">
           <thead className="sticky top-0 z-10 border-b border-line bg-surface/95 text-xs uppercase text-muted backdrop-blur-sm">
             <tr>
+              <th className="px-3 py-2 font-medium">Código</th>
+              <th className="px-3 py-2 font-medium">Nombre</th>
               <th className="px-3 py-2 font-medium">Fecha</th>
-              <th className="px-3 py-2 font-medium">Tipo</th>
-              <th className="px-3 py-2 font-medium">Operación / evento</th>
+              <th className="px-3 py-2 font-medium text-center">Bloque</th>
+              <th className="px-3 py-2 font-medium">Autor / Rol</th>
               <th className="px-3 py-2 font-medium">Estado</th>
-              <th className="px-3 py-2 font-medium">txId</th>
-              <th className="px-3 py-2 font-medium">operacionId</th>
+              <th className="px-3 py-2 font-medium">Firma digital (TXID)</th>
+              <th className="px-3 py-2 font-medium">Enlace Criptográfico</th>
+              <th className="px-3 py-2 font-medium text-center">Acción</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
             {filas.length === 0 && !loading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted">
-                  Pulse Consultar para cargar la auditoría (requiere modo API).
+                <td colSpan={8} className="px-4 py-8 text-center text-muted">
+                  Pulse Consultar para cargar la auditoría de Blockchain (Ledger).
                 </td>
               </tr>
             ) : null}
-            {filas.map((r) => (
-              <tr key={r.id} className="hover:bg-surface/40">
-                <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-300">{formatDemoDateTime(r.fecha)}</td>
-                <td className="px-3 py-2 text-xs text-muted">{r.tipo}</td>
-                <td className="max-w-[240px] px-3 py-2 text-xs text-slate-200">
-                  <span className="line-clamp-2" title={r.funcion + (r.detalle ? ' — ' + r.detalle : '')}>
-                    {r.funcion}
+            {filas.map((r, i) => (
+              <tr key={r.id} className={`hover:bg-surface/40 transition-colors ${selectedIdx === i ? 'bg-accent/10' : ''}`}>
+                <td className="px-3 py-2 font-medium text-slate-100">{r.codigo}</td>
+                <td className="px-3 py-2 text-slate-300">{r.nombre}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-xs text-muted">{formatDemoDateTime(r.fecha)}</td>
+                <td className="px-3 py-2 text-center">
+                  <span className="rounded bg-accent/20 px-1.5 py-0.5 font-mono text-[10px] text-accent">
+                    {r.bloque}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-xs">{r.estado}</td>
-                <td className="px-3 py-2 font-mono text-[11px] text-slate-400">{r.txId || '—'}</td>
-                <td className="px-3 py-2 font-mono text-[11px] text-accent/90">{r.operacionId || '—'}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2 group">
+                    <div className="flex items-center gap-1.5">
+                      <div className={`h-1.5 w-1.5 rounded-full ${r.autor.includes('Carlos') ? 'bg-amber-400' :
+                          r.autor.includes('Ana') ? 'bg-indigo-400' : 'bg-slate-400'
+                        }`}></div>
+                      <span className="text-[11px] font-medium text-slate-200">{r.autor}</span>
+                    </div>
+                    {USUARIOS_DETALLE[r.autor] && (
+                      <button
+                        onClick={() => setSelectedUsuario(r.autor)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity rounded-md bg-accent/10 p-1 text-accent hover:bg-accent hover:text-white"
+                        title="Ver credencial de identidad"
+                      >
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 012-2h2a2 2 0 012 2v1m-6 0h6" /></svg>
+                      </button>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 py-2">
+                  <span className={`rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase ${r.estado.includes('ACTIVO') || r.estado.includes('exito') ? 'bg-emerald-500/20 text-emerald-400' :
+                      'bg-slate-500/20 text-slate-400'
+                    }`}>
+                    {r.estado}
+                  </span>
+                </td>
+                <td className="px-3 py-2 font-mono text-[10px] text-muted">
+                  <div className="flex items-center gap-2">
+                    <span>{r.firma.slice(0, 12)}…</span>
+                    <button
+                      onClick={() => onCopiar(r.firma)}
+                      className="rounded bg-surface p-1 hover:bg-accent/20 hover:text-accent transition-colors"
+                      title="Copiar Firma Digital"
+                    >
+                      <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
+                    </button>
+                  </div>
+                </td>
+                <td className="px-3 py-2 font-mono text-[10px] text-accent/80">
+                  <div className="flex items-center gap-2">
+                    <span>{r.enlace.slice(0, 16)}…</span>
+                    <button
+                      onClick={() => onCopiar(r.enlace)}
+                      className="rounded bg-surface p-1 hover:bg-accent/20 hover:text-accent transition-colors"
+                      title="Copiar Enlace Criptográfico"
+                    >
+                      <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
+                    </button>
+                  </div>
+                </td>
+                <td className="px-3 py-2 text-center">
+                  <button
+                    onClick={() => setSelectedIdx(selectedIdx === i ? null : i)}
+                    className="rounded-lg bg-accent/20 px-3 py-1 text-[10px] font-bold text-accent hover:bg-accent/30 transition-all uppercase"
+                  >
+                    {selectedIdx === i ? 'Cerrar' : 'Ver Detalle'}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Modal de Detalle (Tarjeta Flotante con DIFF) */}
+      {selectedIdx !== null && filas[selectedIdx] && (() => {
+        const row = filas[selectedIdx]
+        const indexAnterior = filas.findIndex((r, idx) => idx > selectedIdx && r.codigo === row.codigo)
+        const rowAnterior = indexAnterior !== -1 ? filas[indexAnterior] : null
+
+        const cambios = obtenerCambios(rowAnterior?.cliente, row.cliente)
+        const campos = Object.keys(row.cliente || {})
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="w-full max-w-2xl rounded-2xl border border-accent/30 bg-surface/95 p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="mb-4 flex items-center justify-between border-b border-line pb-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-100">
+                    {rowAnterior ? 'Comparativa de Cambios' : 'Registro Inicial del Cliente'}
+                  </h3>
+                  <p className="text-[10px] text-muted font-mono truncate max-w-[300px]">{row.firma}</p>
+                </div>
+                <button onClick={() => setSelectedIdx(null)} className="rounded-lg bg-surface/60 px-3 py-1.5 text-xs text-slate-200 hover:bg-elevated transition-colors">Cerrar</button>
+              </div>
+
+              <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="space-y-4">
+                  <div className="overflow-hidden rounded-xl border border-line bg-surface/20">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-surface/40 text-[10px] uppercase text-muted">
+                        <tr>
+                          <th className="px-4 py-2 font-semibold">Campo</th>
+                          <th className="px-4 py-2 font-semibold">Estado Actual / Cambio</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-line">
+                        {campos.map((campo) => {
+                          const cambio = cambios[campo]
+                          return (
+                            <tr key={campo} className="hover:bg-white/[0.02]">
+                              <td className="px-4 py-2.5 font-medium text-slate-500">{campo}</td>
+                              <td className="px-4 py-2.5">
+                                {cambio ? (
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="rounded bg-rose-500/10 px-1.5 py-0.5 text-rose-400 line-through decoration-rose-500/50">
+                                      {str(cambio.anterior) || '(vacío)'}
+                                    </span>
+                                    <span className="text-muted">→</span>
+                                    <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-400 font-semibold">
+                                      {str(cambio.nuevo) || '(vacío)'}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-300 font-mono">{str(row.cliente[campo]) || '(vacío)'}</span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center justify-between">
+                <div className="flex items-center gap-4 text-[10px]">
+                  <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-rose-500"></div> <span className="text-muted">Anterior</span></div>
+                  <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-emerald-500"></div> <span className="text-muted">Nuevo</span></div>
+                </div>
+                <button onClick={() => setSelectedIdx(null)} className="btn-accent rounded-lg bg-accent px-6 py-2 text-xs font-bold text-white shadow-lg shadow-accent/20">Entendido</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* MODAL DE IDENTIDAD DIGITAL (TARGET) */}
+      {selectedUsuario && USUARIOS_DETALLE[selectedUsuario] && (() => {
+        const user = USUARIOS_DETALLE[selectedUsuario]
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-surface shadow-2xl animate-in zoom-in-95 duration-300">
+              {/* Banner Decorativo */}
+              <div className="h-24 bg-gradient-to-r from-accent to-accent-hover"></div>
+
+              {/* Foto de Perfil */}
+              <div className="absolute top-12 left-1/2 -translate-x-1/2">
+                <div className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-surface bg-elevated shadow-xl">
+                  <span className="text-3xl font-bold text-accent">{user.nombre.charAt(0)}</span>
+                </div>
+              </div>
+
+              <div className="mt-16 px-8 pb-10 text-center">
+                <h3 className="text-xl font-bold text-slate-100">{user.nombre}</h3>
+                <p className="text-sm font-semibold text-accent">{user.cargo}</p>
+                <p className="mt-1 text-xs text-muted">{user.depto}</p>
+
+                <div className="mt-8 grid grid-cols-2 gap-4">
+                  <div className="rounded-2xl bg-white/5 p-4 border border-white/5">
+                    <p className="text-[10px] uppercase tracking-widest text-muted">Matrícula</p>
+                    <p className="mt-1 font-mono text-sm font-bold text-slate-200">{user.matricula}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/5 p-4 border border-white/5">
+                    <p className="text-[10px] uppercase tracking-widest text-muted">Estado Red</p>
+                    <p className="mt-1 text-sm font-bold text-emerald-400">Verificado ✅</p>
+                  </div>
+                </div>
+
+                <div className="mt-6 text-left">
+                  <p className="text-[10px] uppercase tracking-widest text-muted mb-2">Biografía y Atribuciones</p>
+                  <p className="text-xs leading-relaxed text-slate-400 italic">"{user.bio}"</p>
+                </div>
+
+                <button
+                  onClick={() => setSelectedUsuario(null)}
+                  className="mt-8 w-full rounded-2xl bg-accent py-3 text-sm font-bold text-white shadow-lg shadow-accent/20 transition-all hover:scale-[1.02] active:scale-95"
+                >
+                  Cerrar Credencial
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

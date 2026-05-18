@@ -3,6 +3,7 @@ package chaincode
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,12 +27,15 @@ type Asset struct {
 	Telefono        string `json:"telefono"`
 	Email           string `json:"email"`
 	Notas           string `json:"notas"`
+	Revision        int    `json:"revision"` // Nuevo: número de revisión de producción
+	IsDraft         bool   `json:"isDraft"`  // Nuevo: indica si es un borrador
+	DraftOf         string `json:"draftOf"`  // Nuevo: ID del cliente original del que es borrador
 }
 
 // InitLedger adds a base set of assets to the ledger
 func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) error {
 	assets := []Asset{
-		{ClienteId: "CLI-INIT", Nombre: "Initial Admin", TipoDocumento: "CI", NumeroDocumento: "0000000", FechaAlta: "2026-04-10", Estado: "ACTIVO", Telefono: "000", Email: "admin@example.com", Notas: "init"},
+		{ClienteId: "CLI-INIT", Nombre: "Initial Admin", TipoDocumento: "CI", NumeroDocumento: "0000000", FechaAlta: "2026-04-10", Estado: "ACTIVO", Telefono: "000", Email: "admin@example.com", Notas: "init", Revision: 1, IsDraft: false, DraftOf: ""},
 	}
 
 	for _, asset := range assets {
@@ -69,6 +73,9 @@ func (s *SmartContract) CreateAsset(ctx contractapi.TransactionContextInterface,
 		Telefono:        tlf,
 		Email:           email,
 		Notas:           notas,
+		Revision:        1,
+		IsDraft:         false,
+		DraftOf:         "",
 	}
 	assetJSON, err := json.Marshal(asset)
 	if err != nil {
@@ -134,6 +141,9 @@ func (s *SmartContract) UpdateAsset(ctx contractapi.TransactionContextInterface,
 		Telefono:        tlf,
 		Email:           email,
 		Notas:           notas,
+		Revision:        prev.Revision + 1,
+		IsDraft:         false,
+		DraftOf:         "",
 	}
 	assetJSON, err := json.Marshal(asset)
 	if err != nil {
@@ -287,5 +297,257 @@ func (s *SmartContract) GetAssetHistory(ctx contractapi.TransactionContextInterf
 	}
 
 	return records, nil
+}
+
+// CrearBorrador crea una copia del registro de producción actual como un borrador editable con ID id + "_DRAFT".
+// Si el cliente no existe todavía, crea un borrador en blanco con valores por defecto.
+func (s *SmartContract) CrearBorrador(ctx contractapi.TransactionContextInterface, id string) error {
+	draftId := id + "_DRAFT"
+
+	var draftAsset Asset
+	existsProd, err := s.AssetExists(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if existsProd {
+		prodAsset, err := s.ReadAsset(ctx, id)
+		if err != nil {
+			return err
+		}
+		// Clonamos los datos actuales
+		draftAsset = *prodAsset
+	} else {
+		// Nuevo borrador desde cero
+		draftAsset = Asset{
+			Estado: "ACTIVO",
+		}
+	}
+
+	draftAsset.ClienteId = draftId
+	draftAsset.IsDraft = true
+	draftAsset.DraftOf = id
+
+	draftAssetJSON, err := json.Marshal(draftAsset)
+	if err != nil {
+		return err
+	}
+
+	err = ctx.GetStub().SetEvent("CrearBorrador", draftAssetJSON)
+	if err != nil {
+		return fmt.Errorf("failed to set event: %v", err)
+	}
+
+	return ctx.GetStub().PutState(draftId, draftAssetJSON)
+}
+
+// ActualizarBorrador edita los campos del borrador de trabajo (id + "_DRAFT")
+func (s *SmartContract) ActualizarBorrador(ctx contractapi.TransactionContextInterface, id string, nombre string, tipoDoc string, numDoc string, fechaAlta string, estado string, tlf string, email string, notas string) error {
+	draftId := id + "_DRAFT"
+	exists, err := s.AssetExists(ctx, draftId)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("EL_BORRADOR_NO_EXISTE: debe crear un borrador primero para %s", id)
+	}
+
+	draftAsset, err := s.ReadAsset(ctx, draftId)
+	if err != nil {
+		return err
+	}
+
+	// Actualizamos los campos en el borrador
+	draftAsset.Nombre = nombre
+	draftAsset.TipoDocumento = tipoDoc
+	draftAsset.NumeroDocumento = numDoc
+	draftAsset.FechaAlta = fechaAlta
+	draftAsset.Estado = estado
+	draftAsset.Telefono = tlf
+	draftAsset.Email = email
+	draftAsset.Notas = notas
+
+	draftAssetJSON, err := json.Marshal(draftAsset)
+	if err != nil {
+		return err
+	}
+
+	err = ctx.GetStub().SetEvent("ActualizarBorrador", draftAssetJSON)
+	if err != nil {
+		return fmt.Errorf("failed to set event: %v", err)
+	}
+
+	return ctx.GetStub().PutState(draftId, draftAssetJSON)
+}
+
+// ConfirmarBorrador (Commit/Merge) toma el estado de id + "_DRAFT", guarda una copia de historial de id
+// en id + "_REV_" + R y sobreescribe la clave principal id con el contenido del borrador consolidado.
+func (s *SmartContract) ConfirmarBorrador(ctx contractapi.TransactionContextInterface, id string) error {
+	draftId := id + "_DRAFT"
+	existsDraft, err := s.AssetExists(ctx, draftId)
+	if err != nil {
+		return err
+	}
+	if !existsDraft {
+		return fmt.Errorf("EL_BORRADOR_NO_EXISTE: no hay borrador activo para confirmar")
+	}
+
+	draftAsset, err := s.ReadAsset(ctx, draftId)
+	if err != nil {
+		return err
+	}
+
+	existsProd, err := s.AssetExists(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	nextRevision := 1
+	if existsProd {
+		prodAsset, err := s.ReadAsset(ctx, id)
+		if err != nil {
+			return err
+		}
+		
+		// Guardamos la instantánea de la revisión actual
+		currentRev := prodAsset.Revision
+		nextRevision = currentRev + 1
+
+		revKey := id + "_REV_" + strconv.Itoa(currentRev)
+		prodAssetJSON, err := json.Marshal(prodAsset)
+		if err != nil {
+			return err
+		}
+		err = ctx.GetStub().PutState(revKey, prodAssetJSON)
+		if err != nil {
+			return fmt.Errorf("failed to save historical revision: %v", err)
+		}
+	}
+
+	// Promovemos el borrador al estado de producción
+	prodAsset := *draftAsset
+	prodAsset.ClienteId = id
+	prodAsset.IsDraft = false
+	prodAsset.DraftOf = ""
+	prodAsset.Revision = nextRevision
+
+	prodAssetJSON, err := json.Marshal(prodAsset)
+	if err != nil {
+		return err
+	}
+
+	// Guardar el registro definitivo en producción
+	err = ctx.GetStub().PutState(id, prodAssetJSON)
+	if err != nil {
+		return fmt.Errorf("failed to commit to production: %v", err)
+	}
+
+	// Borrar el borrador de trabajo
+	err = ctx.GetStub().DelState(draftId)
+	if err != nil {
+		return fmt.Errorf("failed to delete draft: %v", err)
+	}
+
+	err = ctx.GetStub().SetEvent("ConfirmarBorrador", prodAssetJSON)
+	if err != nil {
+		return fmt.Errorf("failed to set event: %v", err)
+	}
+
+	return nil
+}
+
+// RevertirARevision (Rollback) restaura la clave principal id con el contenido guardado en id + "_REV_" + revisionDestino.
+func (s *SmartContract) RevertirARevision(ctx contractapi.TransactionContextInterface, id string, revisionDestino int) error {
+	revKey := id + "_REV_" + strconv.Itoa(revisionDestino)
+	existsRev, err := s.AssetExists(ctx, revKey)
+	if err != nil {
+		return err
+	}
+	if !existsRev {
+		return fmt.Errorf("VERSION_NO_ENCONTRADA: no existe la revisión %d para el cliente %s", revisionDestino, id)
+	}
+
+	histAsset, err := s.ReadAsset(ctx, revKey)
+	if err != nil {
+		return err
+	}
+
+	existsProd, err := s.AssetExists(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if existsProd {
+		prodAsset, err := s.ReadAsset(ctx, id)
+		if err != nil {
+			return err
+		}
+		// Guardamos el estado actual como una nueva revisión antes de revertir
+		currentRev := prodAsset.Revision
+		currentRevKey := id + "_REV_" + strconv.Itoa(currentRev)
+		prodAssetJSON, err := json.Marshal(prodAsset)
+		if err != nil {
+			return err
+		}
+		err = ctx.GetStub().PutState(currentRevKey, prodAssetJSON)
+		if err != nil {
+			return fmt.Errorf("failed to save current revision backup: %v", err)
+		}
+
+		// Reemplazar la producción con la histórica incrementando revisión
+		newProd := *histAsset
+		newProd.ClienteId = id
+		newProd.IsDraft = false
+		newProd.DraftOf = ""
+		newProd.Revision = currentRev + 1
+
+		newProdJSON, err := json.Marshal(newProd)
+		if err != nil {
+			return err
+		}
+
+		err = ctx.GetStub().SetEvent("RevertirARevision", newProdJSON)
+		if err != nil {
+			return fmt.Errorf("failed to set event: %v", err)
+		}
+
+		return ctx.GetStub().PutState(id, newProdJSON)
+	}
+
+	return fmt.Errorf("CLIENTE_NO_EXISTE: no se puede revertir un cliente inexistente")
+}
+
+// ObtenerHistorialRevisiones retorna todas las revisiones congeladas (id + "_REV_<N>") en orden cronológico inverso.
+func (s *SmartContract) ObtenerHistorialRevisiones(ctx contractapi.TransactionContextInterface, id string) ([]*Asset, error) {
+	startKey := id + "_REV_"
+	endKey := id + "_REV~" // '~' (0x7E) > '_' (0x5F) > digits, cubre todos los _REV_N sin bytes no-UTF8
+
+	resultsIterator, err := ctx.GetStub().GetStateByRange(startKey, endKey)
+	if err != nil {
+		return nil, err
+	}
+	defer resultsIterator.Close()
+
+	var revisions []*Asset
+	for resultsIterator.HasNext() {
+		queryResponse, err := resultsIterator.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		var asset Asset
+		err = json.Unmarshal(queryResponse.Value, &asset)
+		if err != nil {
+			return nil, err
+		}
+		revisions = append(revisions, &asset)
+	}
+
+	// Invertimos el orden para que la versión histórica más reciente salga primero
+	for i, j := 0, len(revisions)-1; i < j; i, j = i+1, j-1 {
+		revisions[i], revisions[j] = revisions[j], revisions[i]
+	}
+
+	return revisions, nil
 }
 

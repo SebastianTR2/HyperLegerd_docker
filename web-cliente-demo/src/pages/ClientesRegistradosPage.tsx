@@ -76,6 +76,7 @@ export default function ClientesRegistradosPage() {
                 <th className="px-4 py-2 font-medium">nombre</th>
                 <th className="px-4 py-2 font-medium">documento</th>
                 <th className="px-4 py-2 font-medium">estado</th>
+                <th className="px-4 py-2 font-medium">rev</th>
                 <th className="px-4 py-2 text-right font-medium">acciones</th>
               </tr>
             </thead>
@@ -98,6 +99,15 @@ export default function ClientesRegistradosPage() {
                   <td className="px-4 py-2">
                     <ClienteLedgerEstadoBadge c={r} />
                   </td>
+                  <td className="px-4 py-2">
+                    {r.revision !== undefined ? (
+                      <span className="inline-flex items-center rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-semibold text-indigo-300 ring-1 ring-inset ring-indigo-500/30">
+                        Rev {r.revision}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-2 text-right text-xs">
                     <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
                       <Link className="text-accent hover:underline" to="/consultas" state={{ clienteId: r.clienteId }}>
@@ -108,6 +118,12 @@ export default function ClientesRegistradosPage() {
                         to={`/historial-cliente/${encodeURIComponent(r.clienteId)}`}
                       >
                         Historial
+                      </Link>
+                      <Link
+                        className="font-semibold text-indigo-400 hover:text-indigo-300 hover:underline"
+                        to={`/versiones-cliente/${encodeURIComponent(r.clienteId)}`}
+                      >
+                        Versiones
                       </Link>
                     </div>
                   </td>

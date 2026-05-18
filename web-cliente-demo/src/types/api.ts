@@ -9,6 +9,18 @@ export interface ClienteApi {
   telefono?: string
   email?: string
   notas?: string
+  // Control de versiones y borradores (Git-like)
+  revision?: number
+  isDraft?: boolean
+  draftOf?: string
+}
+
+/** Respuesta del endpoint GET /clientes/:clienteId/versiones */
+export interface HistorialRevisionesApi {
+  ok: boolean
+  clienteId: string
+  total: number
+  revisiones: ClienteApi[]
 }
 
 export interface RegistroHistorialClienteApi {

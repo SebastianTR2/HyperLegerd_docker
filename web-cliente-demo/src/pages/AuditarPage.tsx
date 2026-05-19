@@ -12,7 +12,7 @@ import {
   type LineaTiempoRespuesta,
 } from '../services/apiHistorialCliente'
 import { parseClienteDatos } from '../lib/apiClienteAdapter'
-import { displayClienteField } from '../lib/clienteDisplay'
+import { clienteFilasLegibles, displayClienteField } from '../lib/clienteDisplay'
 import { decodeIfBase64 } from '../lib/ledgerFieldDecode'
 
 // NUEVO: Datos de identidad para auditores (se inyectan por el backend) BORRAR DESPUES PARA ORG2
@@ -445,152 +445,268 @@ export default function AuditarPage() {
 
           {lineaTiempo && lineaTiempo.acciones.length > 0 && (
             <div className="space-y-4">
-              {/* Chips clicables */}
-              <div className="flex flex-wrap gap-3">
-                {lineaTiempo.acciones.map((acc, i) => (
-                  <button
-                    key={`${acc.txId}-${i}`}
-                    onClick={() => setSelectedAccionIdx(selectedAccionIdx === i ? null : i)}
-                    className={`flex items-start gap-3 rounded-xl border p-3 shadow-sm min-w-[180px] text-left transition-all hover:scale-[1.02] ${selectedAccionIdx === i
-                        ? acc.tipo === 'creado' ? 'border-emerald-500 bg-emerald-500/15 ring-1 ring-emerald-500/50' :
-                          acc.tipo === 'baja' ? 'border-rose-500 bg-rose-500/15 ring-1 ring-rose-500/50' :
-                            'border-sky-500 bg-sky-500/15 ring-1 ring-sky-500/50'
-                        : acc.tipo === 'creado' ? 'border-emerald-500/30 bg-emerald-500/5' :
-                          acc.tipo === 'baja' ? 'border-rose-500/30 bg-rose-500/5' :
-                            'border-sky-500/30 bg-sky-500/5'
-                      }`}
-                  >
-                    <div className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-sm ${acc.tipo === 'creado' ? 'bg-emerald-500/20 text-emerald-400' :
-                        acc.tipo === 'baja' ? 'bg-rose-500/20 text-rose-400' :
-                          'bg-sky-500/20 text-sky-400'
-                      }`}>
-                      {acc.tipo === 'creado' ? '★' : acc.tipo === 'baja' ? '✖' : '✎'}
+              {/* ── Nivel 1: Chips principales con flechas de orden ── */}
+              <div className="flex flex-wrap items-center gap-2">
+                {lineaTiempo.acciones.map((acc, i) => {
+                  const isSelected = selectedAccionIdx === i
+                  return (
+                    <div key={`${acc.txId}-${i}`} className="flex items-center gap-2">
+                      {i > 0 && (
+                        <svg className="h-4 w-4 flex-shrink-0 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                        </svg>
+                      )}
+                      <button
+                        onClick={() => {
+                          setSelectedAccionIdx(isSelected ? null : i)
+                        }}
+                        className={`relative flex items-start gap-3 rounded-xl border p-3 shadow-sm min-w-[180px] text-left transition-all hover:scale-[1.02] ${
+                          isSelected
+                            ? acc.tipo === 'creado' ? 'border-emerald-500 bg-emerald-500/15 ring-1 ring-emerald-500/50'
+                              : acc.tipo === 'baja' ? 'border-rose-500 bg-rose-500/15 ring-1 ring-rose-500/50'
+                              : 'border-sky-500 bg-sky-500/15 ring-1 ring-sky-500/50'
+                            : acc.tipo === 'creado' ? 'border-emerald-500/30 bg-emerald-500/5'
+                              : acc.tipo === 'baja' ? 'border-rose-500/30 bg-rose-500/5'
+                              : 'border-sky-500/30 bg-sky-500/5'
+                        }`}
+                      >
+                        <span className="absolute -top-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full bg-slate-700 text-[9px] font-bold text-slate-300 ring-1 ring-slate-600">
+                          {i + 1}
+                        </span>
+                        <div className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-sm ${
+                          acc.tipo === 'creado' ? 'bg-emerald-500/20 text-emerald-400'
+                          : acc.tipo === 'baja' ? 'bg-rose-500/20 text-rose-400'
+                          : 'bg-sky-500/20 text-sky-400'
+                        }`}>
+                          {acc.tipo === 'creado' ? '★' : acc.tipo === 'baja' ? '✖' : '✎'}
+                        </div>
+                        <div className="min-w-0">
+                          <p className={`text-xs font-bold uppercase tracking-wide ${
+                            acc.tipo === 'creado' ? 'text-emerald-400'
+                            : acc.tipo === 'baja' ? 'text-rose-400'
+                            : 'text-sky-400'
+                          }`}>{acc.etiqueta}</p>
+                          <p className="mt-0.5 text-[10px] text-muted">{formatDemoDateTime(acc.fecha)}</p>
+                          <p className="mt-1 font-mono text-[9px] text-slate-500">{acc.txId.slice(0, 14)}…</p>
+                        </div>
+                      </button>
                     </div>
-                    <div className="min-w-0">
-                      <p className={`text-xs font-bold uppercase tracking-wide ${acc.tipo === 'creado' ? 'text-emerald-400' :
-                          acc.tipo === 'baja' ? 'text-rose-400' :
-                            'text-sky-400'
-                        }`}>{acc.etiqueta}</p>
-                      <p className="mt-0.5 text-[10px] text-muted">{formatDemoDateTime(acc.fecha)}</p>
-                      <p className="mt-1 font-mono text-[9px] text-slate-500">
-                        {acc.txId.slice(0, 14)}…
-                      </p>
-                    </div>
-                  </button>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Modal flotante: Comparativa de Cambios por Acción */}
+      {/* UNIFIED GIT-STYLE AUDIT DASHBOARD */}
       {selectedAccionIdx !== null && lineaTiempo?.acciones[selectedAccionIdx] && (() => {
-        const acc = lineaTiempo.acciones[selectedAccionIdx]
-        // historialOps está ordenado ascendente, igual que acciones[]
+        const selectedAcc = lineaTiempo.acciones[selectedAccionIdx]
         const opActual = historialOps[selectedAccionIdx]
         const opAnterior = selectedAccionIdx > 0 ? historialOps[selectedAccionIdx - 1] : null
-        const campos = Object.keys(opActual?.cliente ?? {})
+        const campos = clienteFilasLegibles(opActual?.cliente).map((r) => r.key)
+
+        const getAutorDeNotas = (notas?: string) => {
+          if (!notas) return 'Sistema'
+          if (notas.startsWith('[')) {
+            const match = notas.match(/^\[(.*?)\]/)
+            if (match) return match[1]
+          } else {
+            const n = notas.toUpperCase()
+            if (n.includes('ETAPA 1') || n.includes('REGISTRADO')) return 'Encargado de Almacén'
+            if (n.includes('ETAPA 2') || n.includes('PRODUCCION')) return 'Operador de Planta'
+            if (n.includes('ETAPA 3') || n.includes('CALIDAD')) return 'Inspector de Calidad'
+            if (n.includes('ETAPA 4') || n.includes('SELLADO')) return 'Supervisor General'
+          }
+          return 'Sistema'
+        }
+
+        const selectedAutor = getAutorDeNotas(opActual?.cliente?.notas)
 
         return (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={() => setSelectedAccionIdx(null)}
           >
             <div
-              className="w-full max-w-xl rounded-2xl border border-line bg-[#1a1d2e] shadow-2xl animate-in zoom-in-95 duration-200"
+              className="w-full max-w-5xl h-[85vh] rounded-2xl border border-sky-500/30 bg-[#121420] shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="flex items-start justify-between border-b border-line px-6 py-4">
+              {/* Top Navbar */}
+              <div className="flex items-center justify-between border-b border-line bg-[#16192b] px-6 py-4">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-sm font-bold uppercase tracking-wide ${acc.tipo === 'creado' ? 'text-emerald-400' :
-                        acc.tipo === 'baja' ? 'text-rose-400' : 'text-sky-400'
-                      }`}>
-                      {acc.tipo === 'creado' ? 'Comparativa de Cambios' : `Comparativa de Cambios`}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 font-mono text-[10px] text-muted">{acc.txId.slice(0, 52)}…</p>
+                  <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded bg-sky-500/20 text-xs text-sky-400 font-sans">✎</span>
+                    Panel de Auditoría de Blockchain — Control de Revisiones
+                  </h2>
+                  <p className="text-[10px] text-muted mt-0.5">Código de Registro: <span className="font-mono text-slate-300 font-bold">{lineaTiempo.clienteId}</span></p>
                 </div>
                 <button
                   onClick={() => setSelectedAccionIdx(null)}
-                  className="ml-4 rounded-lg px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                  className="rounded-lg bg-surface/50 border border-line px-3.5 py-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
                 >
                   Cerrar
                 </button>
               </div>
 
-              {/* Tabla de campos */}
-              <div className="max-h-[65vh] overflow-y-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-[#1a1d2e] border-b border-line">
-                    <tr>
-                      <th className="px-6 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted w-1/3">Campo</th>
-                      <th className="px-6 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
-                        {selectedAccionIdx === 0 ? 'Valor Registrado' : 'Estado Actual / Cambio'}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line/40">
-                    {campos.length === 0 ? (
-                      <tr><td colSpan={2} className="px-6 py-6 text-center text-muted italic">Sin datos del registro.</td></tr>
-                    ) : (
-                      campos.map((campo) => {
-                        const valActual = opActual?.cliente?.[campo as keyof typeof opActual.cliente]
-                        const valAnterior = opAnterior?.cliente?.[campo as keyof typeof opAnterior.cliente]
-                        
-                        const actualStr = displayClienteField(campo, valActual)
-                        const anteriorStr = displayClienteField(campo, valAnterior)
-                        
-                        const cambió = opAnterior !== null && String(valAnterior ?? '') !== String(valActual ?? '')
+              {/* Main Content Area: Split View */}
+              <div className="flex flex-1 min-h-0 divide-x divide-line/30">
+                {/* Left Column: Revisions Sidebar (vertical timeline) */}
+                <div className="w-1/3 bg-[#16192b]/35 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted px-1">Línea de Tiempo del Registro</p>
+                  
+                  <div className="space-y-2">
+                    {lineaTiempo.acciones.map((acc, idx) => {
+                      const isSelected = selectedAccionIdx === idx
+                      const opAct = historialOps[idx]
+                      const opAnt = idx > 0 ? historialOps[idx - 1] : null
+                      const countModificados = clienteFilasLegibles(opAct?.cliente).filter(
+                        ({ key, value }) =>
+                          opAnt !== null &&
+                          String(
+                            clienteFilasLegibles(opAnt?.cliente).find((r) => r.key === key)?.value ?? '',
+                          ) !== String(value ?? ''),
+                      ).length
 
-                        return (
-                          <tr key={campo} className={cambió ? 'bg-accent/5' : ''}>
-                            <td className={`px-6 py-3 font-medium ${cambió ? 'text-accent' : 'text-slate-400'}`}>
-                              {campo}
-                            </td>
-                            <td className="px-6 py-3">
-                              {cambió ? (
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className="rounded bg-rose-500/10 px-1.5 py-0.5 font-mono text-[10px] text-rose-300/80 line-through">
-                                    {anteriorStr || '(vacío)'}
-                                  </span>
-                                  <span className="text-muted text-[10px]">→</span>
-                                  <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 font-mono text-[10px] font-medium text-emerald-400">
-                                    {actualStr || '(vacío)'}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="font-mono text-slate-300">{actualStr || '—'}</span>
+                      return (
+                        <button
+                          key={`${acc.txId}-${idx}`}
+                          onClick={() => setSelectedAccionIdx(idx)}
+                          className={`w-full text-left p-3 rounded-xl border transition-all flex items-start gap-3 hover:scale-[1.01] ${
+                            isSelected
+                              ? 'border-sky-500 bg-sky-500/10 ring-1 ring-sky-500/40'
+                              : 'border-line/60 bg-surface/30 hover:border-line'
+                          }`}
+                        >
+                          <div className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
+                            acc.tipo === 'creado' ? 'bg-emerald-500/20 text-emerald-400'
+                            : acc.tipo === 'baja' ? 'bg-rose-500/20 text-rose-400'
+                            : 'bg-sky-500/20 text-sky-400'
+                          }`}>
+                            {acc.tipo === 'creado' ? '★' : acc.tipo === 'baja' ? '✖' : '✎'}
+                          </div>
+                          
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className={`text-xs font-bold ${
+                                acc.tipo === 'creado' ? 'text-emerald-400'
+                                : acc.tipo === 'baja' ? 'text-rose-400'
+                                : 'text-sky-400'
+                              }`}>
+                                {acc.tipo === 'creado' ? 'Snap Original (Bloque)' : `Edición #${idx}`}
+                              </span>
+                              {acc.tipo === 'editado' && (
+                                <span className="rounded bg-sky-500/20 px-1.5 py-0.2 font-mono text-[9px] text-sky-300 font-bold">
+                                  {countModificados} campo{countModificados !== 1 ? 's' : ''}
+                                </span>
                               )}
-                            </td>
-                          </tr>
-                        )
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Footer */}
-              <div className="flex items-center justify-between border-t border-line px-6 py-3">
-                <div className="flex items-center gap-4 text-[10px] text-muted">
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2 w-2 rounded-full bg-rose-500/60"></div>
-                    <span>Anterior</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
-                    <span>Nuevo</span>
+                            </div>
+                            <p className="text-[10px] text-slate-300 truncate mt-0.5">{formatDemoDateTime(acc.fecha)}</p>
+                            <p className="text-[9px] text-muted font-mono truncate mt-1">Tx: {acc.txId.slice(0, 24)}…</p>
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
-                <button
-                  onClick={() => setSelectedAccionIdx(null)}
-                  className="rounded-xl bg-accent px-5 py-2 text-xs font-bold text-white hover:bg-accent-hover transition-colors"
-                >
-                  Entendido
-                </button>
+
+                {/* Right Column: Comparative attributes view */}
+                <div className="w-2/3 flex flex-col bg-[#121420] overflow-hidden">
+                  {/* Action Details Header */}
+                  <div className="bg-[#16192b]/20 border-b border-line/30 p-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-400/80">Detalle de la Modificación</p>
+                    <h3 className="text-xs font-bold text-slate-100 mt-1 flex items-center gap-1.5">
+                      {selectedAcc.tipo === 'creado' ? (
+                        <span className="text-emerald-400 flex items-center gap-1">★ Snap Inmutable Inicial (Creación)</span>
+                      ) : (
+                        <span className="text-sky-400 flex items-center gap-1">✎ Bloque de Modificaciones #{selectedAccionIdx}</span>
+                      )}
+                    </h3>
+                    
+                    <div className="grid grid-cols-2 gap-4 mt-3 text-[10px] text-slate-400 bg-surface/20 p-2.5 rounded-lg border border-line/40">
+                      <div>
+                        <span className="text-muted block">Autor / Firma digital:</span>
+                        <span className="text-slate-200 font-medium">{selectedAutor}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted block">Fecha de Registro (Ledger):</span>
+                        <span className="text-slate-200 font-medium">{formatDemoDateTime(selectedAcc.fecha)}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-muted block">Enlace Criptográfico / TxID:</span>
+                        <span className="text-slate-300 font-mono block break-all">{selectedAcc.txId}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Attributes Comparison Table */}
+                  <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-line text-[10px] uppercase text-muted">
+                          <th className="py-2.5 w-1/3">Atributo</th>
+                          <th className="py-2.5">
+                            {selectedAccionIdx === 0 ? 'Valor Registrado' : 'Estado Actual / Cambio'}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-line/40">
+                        {campos.length === 0 ? (
+                          <tr>
+                            <td colSpan={2} className="py-8 text-center text-muted italic">Sin datos registrados.</td>
+                          </tr>
+                        ) : (
+                          campos.map((campo) => {
+                            const valActual = opActual?.cliente?.[campo]
+                            const valAnterior = opAnterior?.cliente?.[campo]
+                            
+                            const actualStr = displayClienteField(campo, valActual)
+                            const anteriorStr = displayClienteField(campo, valAnterior)
+                            
+                            const cambió = opAnterior !== null && String(valAnterior ?? '') !== String(valActual ?? '')
+
+                            return (
+                              <tr key={campo} className={`transition-colors ${cambió ? 'bg-sky-500/5 hover:bg-sky-500/10' : 'hover:bg-surface/20'}`}>
+                                <td className={`py-3 font-semibold ${cambió ? 'text-sky-400' : 'text-slate-400'}`}>
+                                  {campo}
+                                </td>
+                                <td className="py-3">
+                                  {cambió ? (
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="rounded bg-rose-500/10 px-1.5 py-0.5 font-mono text-[10px] text-rose-300/80 line-through">
+                                        {anteriorStr || '(vacío)'}
+                                      </span>
+                                      <span className="text-slate-500 text-[10px]">→</span>
+                                      <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 font-mono text-[10px] font-medium text-emerald-400">
+                                        {actualStr || '(vacío)'}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="font-mono text-slate-300">{actualStr || '—'}</span>
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Table Legend */}
+                  <div className="flex items-center justify-start border-t border-line px-6 py-3 bg-[#16192b]/10">
+                    <div className="flex items-center gap-4 text-[10px] text-muted">
+                      <div className="flex items-center gap-1.5">
+                        <div className="h-2 w-2 rounded-full bg-rose-500/60"></div>
+                        <span>Anterior</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
+                        <span>Nuevo</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

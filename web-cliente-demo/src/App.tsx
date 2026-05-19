@@ -12,6 +12,7 @@ import PanelPage from './pages/PanelPage'
 import RegistrosPage from './pages/RegistrosPage'
 import TokensPage from './pages/TokensPage'
 import TrazabilidadPage from './pages/TrazabilidadPage'
+import VersionesClientePage from './pages/VersionesClientePage'
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="cuentas-visibles" element={<CuentasTokenVisiblesPage />} />
         <Route path="clientes-registrados" element={<ClientesRegistradosPage />} />
         <Route path="historial-cliente/:clienteId" element={<ClienteHistorialPage />} />
+        <Route path="versiones-cliente/:clienteId" element={<VersionesClientePage />} />
         <Route path="historial" element={<HistorialPage />} />
         <Route path="auditoria" element={<AuditarPage />} />
         <Route path="trazabilidad" element={<TrazabilidadPage />} />

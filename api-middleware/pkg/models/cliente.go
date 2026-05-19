@@ -11,6 +11,10 @@ type Cliente struct {
 	Telefono        string `json:"telefono,omitempty"`
 	Email           string `json:"email,omitempty" binding:"omitempty,email"`
 	Notas           string `json:"notas,omitempty"`
+	// Campos del sistema de control de versiones y borradores
+	Revision int    `json:"revision"`  // Número de revisión oficial (se incrementa en cada commit)
+	IsDraft  bool   `json:"isDraft"`   // true si este registro es un borrador (WIP)
+	DraftOf  string `json:"draftOf"`   // ID del cliente original del que es borrador
 }
 
 // ClientePatch campos opcionales para actualización (PATCH). No incluye clienteId ni fechaAlta.

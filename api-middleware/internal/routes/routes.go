@@ -32,6 +32,13 @@ func SetupRoutes(router *gin.Engine) {
 	router.GET("/clientes/historial/:clienteId", append(authCualquierRol, handlers.ConsultarHistorialCliente)...)
 	router.GET("/clientes/historial-resumido/:clienteId", append(authCualquierRol, handlers.ConsultarLineaTiempoCliente)...)
 
+	// ── Sistema de Borradores y Control de Versiones (Git-like) ──────────────
+	router.POST("/clientes/:clienteId/draft", append(authIntegradorOAdmin, handlers.CrearBorrador)...)
+	router.PUT("/clientes/:clienteId/draft", append(authIntegradorOAdmin, handlers.ActualizarBorrador)...)
+	router.POST("/clientes/:clienteId/commit", append(authIntegradorOAdmin, handlers.ConfirmarBorrador)...)
+	router.POST("/clientes/:clienteId/rollback/:revision", append(authSoloAdmin, handlers.RevertirARevision)...)
+	router.GET("/clientes/:clienteId/versiones", append(authCualquierRol, handlers.ObtenerHistorialRevisiones)...)
+
 	// Cuentas token visibles (Fase 2): rutas literales antes que :alias
 	router.GET("/tokens/cuentas", append(authCualquierRol, handlers.ListarCuentasToken)...)
 	router.POST("/tokens/cuentas", append(authIntegradorOAdmin, handlers.CrearCuentaTokenVisible)...)

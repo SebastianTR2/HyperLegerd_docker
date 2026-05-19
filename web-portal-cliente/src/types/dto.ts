@@ -36,5 +36,10 @@ export interface ClienteDetalleDto {
   fechaAlta: string
   telefono: string
   correo: string
+  /** Nota de negocio (sin FIRMA, actor ni marcas técnicas). */
   notas: string
+  /** Metadatos de auditoría / ledger; solo lectura en ficha y edición. */
+  informacionAuditoria?: string | null
+  /** Baja lógica detectada en ledger (INACTIVO + marca o DADO_DE_BAJA). */
+  esBajaLogica: boolean
 }

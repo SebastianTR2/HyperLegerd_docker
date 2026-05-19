@@ -2,14 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { actualizarClienteDesdeApi, consultarClienteDesdeApi } from '../services/clientesApi'
 import type { ClienteFormDto } from '../types/dto'
-import { detalleToFormDto, formularioEdicionToPartialPayload, esClienteBajaLogica } from '../lib/mappers'
+import { detalleToFormDto, formularioEdicionToPartialPayload } from '../lib/mappers'
 import { ApiHttpError } from '../services/apiClient'
 import { logTechnicalApiFailure } from '../lib/apiErrors'
-import { Card, Button, Field, TextInput, TextArea, Select } from '../components/ui'
-import { AccesoServicioBloqueado, ServicioNoConfigurado } from '../components/PortalServiceMessages'
+import { Card, Button, Field, TextInput, TextArea, Select, Accordion } from '../components/ui'
+import { AccesoServicioBloqueado } from '../components/PortalServiceMessages'
 import { logClienteActualizado, useSessionLog } from '../context/SessionLogContext'
-import { useSettings } from '../context/SettingsContext'
-import { esSoloLectura } from '../lib/roleFromKey'
+import { useAuth } from '../context/AuthContext'
 
 export default function EditarClientePage() {
   const { clienteId: rawId } = useParams()
@@ -21,18 +20,12 @@ export default function EditarClientePage() {
   const [saving, setSaving] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const [accessBlocked, setAccessBlocked] = useState(false)
+  const [auditoria, setAuditoria] = useState<string | null>(null)
   const log = useSessionLog()
-  const { apiKey, isServiceConfigured } = useSettings()
-  const readOnly = esSoloLectura(apiKey)
+  const { readOnly } = useAuth()
 
   useEffect(() => {
     if (!clienteId) return
-    if (!isServiceConfigured) {
-      setLoading(false)
-      setForm(null)
-      setAccessBlocked(false)
-      return
-    }
     let ok = true
     setLoading(true)
     setAccessBlocked(false)
@@ -41,11 +34,13 @@ export default function EditarClientePage() {
       .then((d) => {
         if (!ok) return
         if (d) {
-          setBloqueadoBaja(esClienteBajaLogica({ estadoCodigo: d.estadoCodigo, notas: d.notas }))
+          setBloqueadoBaja(d.esBajaLogica)
+          setAuditoria(d.informacionAuditoria ?? null)
           setForm(detalleToFormDto(d))
         } else {
           setForm(null)
           setBloqueadoBaja(false)
+          setAuditoria(null)
         }
       })
       .catch((e: unknown) => {
@@ -64,7 +59,7 @@ export default function EditarClientePage() {
     return () => {
       ok = false
     }
-  }, [clienteId, isServiceConfigured])
+  }, [clienteId])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -101,17 +96,6 @@ export default function EditarClientePage() {
 
   if (!clienteId) {
     return <p className="text-sm text-[#6B7280]">Código de cliente no válido.</p>
-  }
-
-  if (!isServiceConfigured) {
-    return (
-      <div className="mx-auto max-w-lg space-y-4">
-        <ServicioNoConfigurado />
-        <Link className="text-sm text-[#D97706] hover:underline" to="/clientes">
-          Volver al listado
-        </Link>
-      </div>
-    )
   }
 
   if (loading) {
@@ -225,9 +209,14 @@ export default function EditarClientePage() {
               />
             </Field>
           </div>
-          <Field label="Notas">
+          <Field label="Notas" hint="Solo la observación de negocio; no incluya datos técnicos del sistema.">
             <TextArea rows={3} value={form.notas} onChange={(e) => setForm((f) => (f ? { ...f, notas: e.target.value } : f))} />
           </Field>
+          {auditoria ? (
+            <Accordion title="Información de auditoría">
+              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-[#6B7280]">{auditoria}</pre>
+            </Accordion>
+          ) : null}
           <div className="flex flex-wrap justify-end gap-2 border-t border-[#E8E1D8] pt-4">
             <Link to={`/clientes/${encodeURIComponent(clienteId)}`}>
               <Button variant="secondary" type="button">

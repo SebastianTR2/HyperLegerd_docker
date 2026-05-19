@@ -1,5 +1,7 @@
 import * as React from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import { rolEtiqueta } from '../lib/roles'
 
 const nav: { to: string; label: string; end: boolean; icon: React.ReactNode }[] = [
   { to: '/', label: 'Inicio', end: true, icon: <IconHome /> },
@@ -36,6 +38,15 @@ function titleForPath(path: string): { title: string; subtitle?: string } {
 export function AppLayout() {
   const loc = useLocation()
   const { title, subtitle } = titleForPath(loc.pathname)
+  const { user, logout, readOnly } = useAuth()
+  const navigate = useNavigate()
+
+  const navVisible = nav.filter((item) => !(readOnly && item.to === '/clientes/nuevo'))
+
+  async function onLogout() {
+    await logout()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="flex min-h-screen bg-[#F8F6F2]">
@@ -52,7 +63,7 @@ export function AppLayout() {
           </div>
         </div>
         <nav className="flex flex-1 flex-col gap-1 p-3">
-          {nav.map((item) => (
+          {navVisible.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -85,7 +96,7 @@ export function AppLayout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="portal-topnav flex gap-1 overflow-x-auto border-b border-[#E8E1D8] bg-white px-2 py-2 shadow-sm lg:hidden">
-          {nav.map((item) => (
+          {navVisible.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -108,7 +119,21 @@ export function AppLayout() {
               <h2 className="text-xl font-bold tracking-tight text-[#1F2937]">{title}</h2>
               {subtitle ? <p className="mt-1 text-sm leading-relaxed text-[#6B7280]">{subtitle}</p> : null}
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+              {user ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#E8E1D8] bg-[#F5F2EC]/50 px-3 py-2 text-sm">
+                  <span className="font-medium text-[#1F2937]">
+                    {user.nombreCompleto} · {rolEtiqueta(user.rol)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void onLogout()}
+                    className="rounded-lg border border-[#E8E1D8] bg-white px-2.5 py-1 text-xs font-semibold text-[#374151] hover:bg-[#FFF1E6] hover:text-[#D97706]"
+                  >
+                    Cerrar sesión
+                  </button>
+                </div>
+              ) : null}
               <HeaderSearch />
             </div>
           </div>

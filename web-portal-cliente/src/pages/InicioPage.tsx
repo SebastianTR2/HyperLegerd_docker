@@ -11,25 +11,18 @@ import {
 import { Card, Button, Badge } from '../components/ui'
 import { formatDisplayDate } from '../lib/formatDate'
 import { useSessionLog } from '../context/SessionLogContext'
-import { useSettings } from '../context/SettingsContext'
-import { AccesoServicioBloqueado, ServicioNoConfigurado } from '../components/PortalServiceMessages'
+import { useAuth } from '../context/AuthContext'
+import { AccesoServicioBloqueado } from '../components/PortalServiceMessages'
 
 export default function InicioPage() {
   const { messages, activities } = useSessionLog()
-  const { isServiceConfigured } = useSettings()
+  const { puedeEscribir } = useAuth()
   const [items, setItems] = useState<ClienteListItemDto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [accessBlocked, setAccessBlocked] = useState(false)
 
   useEffect(() => {
-    if (!isServiceConfigured) {
-      setItems([])
-      setError(null)
-      setAccessBlocked(false)
-      setLoading(false)
-      return
-    }
     let ok = true
     setLoading(true)
     setError(null)
@@ -50,18 +43,14 @@ export default function InicioPage() {
     return () => {
       ok = false
     }
-  }, [isServiceConfigured])
+  }, [])
 
   const recientes = items.slice(0, 5)
   const total = items.length
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
-      {!isServiceConfigured ? (
-        <ServicioNoConfigurado />
-      ) : accessBlocked && error ? (
-        <AccesoServicioBloqueado />
-      ) : null}
+      {accessBlocked && error ? <AccesoServicioBloqueado /> : null}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -69,11 +58,6 @@ export default function InicioPage() {
             <Card title="Resumen" subtitle="Clientes disponibles en el listado.">
               {loading ? (
                 <p className="text-sm text-[#6B7280]">Cargando…</p>
-              ) : !isServiceConfigured ? (
-                <div className="space-y-1">
-                  <p className="text-2xl font-semibold text-[#6B7280]">—</p>
-                  <p className="text-xs text-[#6B7280]">Conecte el portal para ver datos actualizados.</p>
-                </div>
               ) : error && !accessBlocked ? (
                 <p className="text-sm text-red-800">{error}</p>
               ) : accessBlocked ? (
@@ -90,11 +74,11 @@ export default function InicioPage() {
             </Card>
             <Card title="Accesos rápidos" subtitle="Operaciones habituales.">
               <div className="flex flex-col gap-2">
-                <Link to="/clientes/nuevo">
-                  <Button className="w-full" disabled={!isServiceConfigured}>
-                    Registrar nuevo cliente
-                  </Button>
-                </Link>
+                {puedeEscribir ? (
+                  <Link to="/clientes/nuevo">
+                    <Button className="w-full">Registrar nuevo cliente</Button>
+                  </Link>
+                ) : null}
                 <Link to="/clientes">
                   <Button variant="secondary" className="w-full">
                     Ver clientes
@@ -107,11 +91,6 @@ export default function InicioPage() {
           <Card title="Clientes recientes" subtitle="Últimos registros visibles en el listado.">
             {loading ? (
               <p className="text-sm text-[#6B7280]">Cargando…</p>
-            ) : !isServiceConfigured ? (
-              <div className="rounded-xl border border-dashed border-[#E8E1D8] bg-white/60 px-4 py-8 text-center">
-                <p className="text-sm text-[#1F2937]">No hay clientes registrados todavía.</p>
-                <p className="mt-2 text-xs text-[#6B7280]">Cuando el portal esté conectado y registre clientes, aparecerán aquí.</p>
-              </div>
             ) : accessBlocked ? (
               <div className="rounded-xl border border-dashed border-[#E8E1D8] bg-white/60 px-4 py-8 text-center">
                 <p className="text-sm text-[#1F2937]">No hay datos para mostrar.</p>

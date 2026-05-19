@@ -9,9 +9,8 @@ import {
 } from '../lib/apiErrors'
 import { Card, Button, Badge } from '../components/ui'
 import { formatDisplayDate } from '../lib/formatDate'
-import { useSettings } from '../context/SettingsContext'
-import { esSoloLectura } from '../lib/roleFromKey'
-import { AccesoServicioBloqueado, ServicioNoConfigurado } from '../components/PortalServiceMessages'
+import { useAuth } from '../context/AuthContext'
+import { AccesoServicioBloqueado } from '../components/PortalServiceMessages'
 
 export default function ClientesPage() {
   const [params] = useSearchParams()
@@ -20,17 +19,9 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [accessBlocked, setAccessBlocked] = useState(false)
-  const { apiKey, isServiceConfigured } = useSettings()
-  const readOnly = esSoloLectura(apiKey)
+  const { readOnly } = useAuth()
 
   useEffect(() => {
-    if (!isServiceConfigured) {
-      setRows([])
-      setError(null)
-      setAccessBlocked(false)
-      setLoading(false)
-      return
-    }
     let ok = true
     setLoading(true)
     setError(null)
@@ -51,7 +42,7 @@ export default function ClientesPage() {
     return () => {
       ok = false
     }
-  }, [isServiceConfigured])
+  }, [])
 
   const filtrados = useMemo(() => {
     if (!buscar) return rows
@@ -65,8 +56,7 @@ export default function ClientesPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      {!isServiceConfigured ? <ServicioNoConfigurado /> : null}
-      {isServiceConfigured && accessBlocked ? <AccesoServicioBloqueado /> : null}
+      {accessBlocked ? <AccesoServicioBloqueado /> : null}
 
       <Card title="Listado de clientes" subtitle="Consulta y gestión de registros.">
         {readOnly ? (
@@ -76,10 +66,6 @@ export default function ClientesPage() {
         ) : null}
         {loading ? (
           <p className="text-sm text-[#6B7280]">Cargando…</p>
-        ) : !isServiceConfigured ? (
-          <div className="rounded-xl border border-dashed border-[#E8E1D8] bg-white/60 px-4 py-8 text-center text-sm text-[#6B7280]">
-            No hay clientes registrados todavía.
-          </div>
         ) : accessBlocked ? (
           <div className="rounded-xl border border-dashed border-[#E8E1D8] bg-white/60 px-4 py-8 text-center text-sm text-[#6B7280]">
             No se pudieron cargar los datos. Intente más tarde o contacte al administrador.
@@ -129,16 +115,26 @@ export default function ClientesPage() {
                         <Link to={`/clientes/${encodeURIComponent(r.codigo)}`}>
                           <Button variant="secondary">Ver</Button>
                         </Link>
-                        <Link to={`/clientes/${encodeURIComponent(r.codigo)}/editar`}>
-                          <Button variant="secondary" disabled={readOnly || r.esBajaLogica || r.estadoCodigo === 'DADO_DE_BAJA'}>
-                            Editar
-                          </Button>
-                        </Link>
-                        <Link to={`/clientes/${encodeURIComponent(r.codigo)}?intent=baja`}>
-                          <Button variant="secondary" disabled={readOnly || r.esBajaLogica || r.estadoCodigo === 'DADO_DE_BAJA'}>
-                            Dar de baja
-                          </Button>
-                        </Link>
+                        {!readOnly ? (
+                          <>
+                            <Link to={`/clientes/${encodeURIComponent(r.codigo)}/editar`}>
+                              <Button
+                                variant="secondary"
+                                disabled={r.esBajaLogica || r.estadoCodigo === 'DADO_DE_BAJA'}
+                              >
+                                Editar
+                              </Button>
+                            </Link>
+                            <Link to={`/clientes/${encodeURIComponent(r.codigo)}?intent=baja`}>
+                              <Button
+                                variant="secondary"
+                                disabled={r.esBajaLogica || r.estadoCodigo === 'DADO_DE_BAJA'}
+                              >
+                                Dar de baja
+                              </Button>
+                            </Link>
+                          </>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

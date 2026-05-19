@@ -8,7 +8,12 @@ export interface ClienteApi {
   estado: string
   telefono?: string
   email?: string
+  /** Nota de negocio (sin FIRMA/actor técnico). */
   notas?: string
+  /** Notas crudas del ledger; solo para detectar baja lógica. */
+  notasLedger?: string
+  /** Metadatos de auditoría / trazabilidad (solo lectura en UI). */
+  informacionAuditoria?: string | null
 }
 
 export interface RegistroHistorialClienteApi {

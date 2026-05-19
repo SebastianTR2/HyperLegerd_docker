@@ -141,7 +141,7 @@ export default function ConsultasPage() {
           {lastError && !lastApiRow ? (
             <p className="text-sm text-danger/90">{lastError}</p>
           ) : apiRegistro ? (
-            <ApiResultView r={apiRegistro} />
+            <ApiResultView r={apiRegistro} informacionAuditoria={lastApiRow?.informacionAuditoria} />
           ) : (
             <p className="text-sm text-muted">Ejecute una consulta con un clienteId válido.</p>
           )}
@@ -151,7 +151,7 @@ export default function ConsultasPage() {
   )
 }
 
-function ApiResultView({ r }: { r: Registro }) {
+function ApiResultView({ r, informacionAuditoria }: { r: Registro; informacionAuditoria?: string | null }) {
   return (
     <div className="space-y-4">
       <div
@@ -203,6 +203,14 @@ function ApiResultView({ r }: { r: Registro }) {
           </div>
         ) : null}
       </dl>
+      {informacionAuditoria?.trim() ? (
+        <div className="rounded-xl border border-line/60 bg-surface/40 p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Información de auditoría</p>
+          <pre className="mt-2 whitespace-pre-wrap font-sans text-xs leading-relaxed text-slate-400">
+            {informacionAuditoria}
+          </pre>
+        </div>
+      ) : null}
     </div>
   )
 }

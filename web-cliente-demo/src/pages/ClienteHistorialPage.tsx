@@ -2,36 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { describeApiError } from '../lib/apiErrorMessage'
 import { formatDemoDateTime } from '../lib/format'
+import { clienteFilasLegibles, displayClienteField } from '../lib/clienteDisplay'
 import { fetchHistorialCliente, fetchLineaTiempoCliente, operacionesAVista } from '../services/apiHistorialCliente'
 import type { HistorialFilaVista, AccionLineaTiempo } from '../services/apiHistorialCliente'
 
 const btn =
   'inline-flex items-center justify-center rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-slate-100 shadow-sm transition-colors hover:bg-accent-hover disabled:opacity-50'
-
-interface CambioCampo {
-  campo: string
-  antes: string
-  despues: string
-}
-
-function obtenerCambios(prev: any, curr: any): CambioCampo[] {
-  if (!prev) return []
-  const cambios: CambioCampo[] = []
-  const keys = Array.from(new Set([...Object.keys(prev), ...Object.keys(curr)]))
-
-  for (const key of keys) {
-    const valPrev = String(prev[key] ?? '')
-    const valCurr = String(curr[key] ?? '')
-    if (valPrev !== valCurr) {
-      cambios.push({
-        campo: key,
-        antes: valPrev || '(vacío)',
-        despues: valCurr || '(vacío)'
-      })
-    }
-  }
-  return cambios
-}
 
 export default function ClienteHistorialPage() {
   const { clienteId: clienteIdParam } = useParams()
@@ -214,11 +190,19 @@ export default function ClienteHistorialPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
-                    {Object.entries(rows[selectedIdx].cliente || {}).map(([key, val]) => (
+                    {clienteFilasLegibles(rows[selectedIdx].cliente).map(({ key, value }) => (
                       <tr key={key} className="group">
                         <td className="px-4 py-2.5 font-medium text-slate-400">{key}</td>
                         <td className="px-4 py-2.5">
-                          <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-300">{String(val || '(vacío)')}</span>
+                          <span
+                            className={`rounded px-1.5 py-0.5 ${
+                              key === 'informacionAuditoria'
+                                ? 'bg-surface/60 text-[10px] text-muted whitespace-pre-wrap'
+                                : 'bg-emerald-500/10 text-emerald-300'
+                            }`}
+                          >
+                            {displayClienteField(key, value)}
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -237,22 +221,35 @@ export default function ClienteHistorialPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
-                    {Object.entries(rows[selectedIdx].cliente || {}).map(([key, val]) => {
-                      const prevVal = rows[selectedIdx - 1].cliente?.[key as keyof typeof rows[0]['cliente']]
-                      const hasChanged = String(prevVal ?? '') !== String(val ?? '')
-                      
+                    {clienteFilasLegibles(rows[selectedIdx].cliente).map(({ key, value }) => {
+                      const prevRow = clienteFilasLegibles(rows[selectedIdx - 1].cliente).find((r) => r.key === key)
+                      const prevVal = prevRow?.value ?? ''
+                      const hasChanged = prevVal !== value
+
                       return (
                         <tr key={key} className={hasChanged ? 'bg-accent/5' : ''}>
                           <td className={`px-4 py-2.5 font-medium ${hasChanged ? 'text-accent' : 'text-slate-500'}`}>{key}</td>
                           <td className="px-4 py-2.5">
                             {hasChanged ? (
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] text-rose-300/60 line-through">{String(prevVal || '(vacío)')}</span>
+                                <span className="rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] text-rose-300/60 line-through">
+                                  {displayClienteField(key, prevVal)}
+                                </span>
                                 <span className="text-muted text-[10px]">→</span>
-                                <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 font-medium text-emerald-400">{String(val || '(vacío)')}</span>
+                                <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 font-medium text-emerald-400">
+                                  {displayClienteField(key, value)}
+                                </span>
                               </div>
                             ) : (
-                              <span className="text-slate-400">{String(val || '(vacío)')}</span>
+                              <span
+                                className={
+                                  key === 'informacionAuditoria'
+                                    ? 'text-[10px] text-muted whitespace-pre-wrap'
+                                    : 'text-slate-400'
+                                }
+                              >
+                                {displayClienteField(key, value)}
+                              </span>
                             )}
                           </td>
                         </tr>

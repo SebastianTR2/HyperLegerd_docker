@@ -2,35 +2,65 @@
 
 Aplicación web orientada al **usuario de negocio** para registrar y consultar clientes. La consola administrativa del equipo (`web-cliente-demo`) cubre auditoría y control avanzado.
 
+## Arquitectura local
+
+Tres servicios en desarrollo:
+
+| Servicio | Puerto | Rol |
+|----------|--------|-----|
+| `api-middleware` | 3000 | API Fabric + auditoría |
+| `web-portal-api` | 3001 | Login JWT, sesiones SQLite, proxy a middleware |
+| `web-portal-cliente` (Vite) | 5174 | UI React |
+
+El navegador solo habla con Vite (`/portal-api` → proxy a `web-portal-api`). Las claves `X-API-Key` del middleware **no** se envían al frontend.
+
 ## Requisitos
 
 - Node.js 18+
-- Servicio de datos en ejecución (puerto típico **3000** en integración)
+- Go 1.22+ (para `web-portal-api`)
+- `api-middleware` en ejecución con las API keys configuradas en su `.env`
 
-## Instalación
+## Instalación (frontend)
 
 ```bash
 cd web-portal-cliente
 npm install
 ```
 
-## Variables de entorno
-
-Copie `.env.example` a `.env` o cree **`.env.local`** (recomendado; no lo suba a Git) con el destino del proxy y la clave interna del portal:
+Variables opcionales (`.env` o `.env.local`):
 
 ```env
-VITE_API_TARGET=http://localhost:3000
-VITE_PORTAL_API_KEY=
+VITE_PORTAL_API_TARGET=http://127.0.0.1:3001
 ```
 
-Ejemplo si el servicio corre en otra máquina (p. ej. WSL):
+## Levantar todo (orden recomendado)
 
-```env
-VITE_API_TARGET=http://172.19.63.107:3000
-VITE_PORTAL_API_KEY=sec-admin
-```
+1. **Middleware** (desde `api-middleware`, con Fabric/red según su README).
+2. **Portal API**:
 
-La clave debe coincidir con la que acepta el servicio en integración. Opcionalmente, en desarrollo puede guardarse una clave en el almacenamiento del navegador como respaldo (misma clave que en `VITE_PORTAL_API_KEY`).
+   ```bash
+   cd web-portal-api
+   cp .env.example .env   # ajustar MIDDLEWARE_URL y API_KEY_* 
+   go mod tidy
+   go run ./cmd/server
+   ```
+
+3. **Frontend**:
+
+   ```bash
+   cd web-portal-cliente
+   npm run dev
+   ```
+
+Abrir `http://localhost:5174/login`.
+
+## Usuarios demo
+
+| Usuario | Contraseña | Permisos en portal |
+|---------|------------|-------------------|
+| admin | admin123 | Lectura y escritura (rol admin) |
+| trabajador | trabajador123 | Lectura y escritura (rol integrador) |
+| lectura | lectura123 | Solo consulta |
 
 ## Desarrollo
 
@@ -38,7 +68,7 @@ La clave debe coincidir con la que acepta el servicio en integración. Opcionalm
 npm run dev
 ```
 
-La app se sirve en el puerto **5174**. Las peticiones usan rutas relativas `/api/...`; Vite las reenvía al valor de `VITE_API_TARGET`.
+Puerto **5174**. Rutas de API del portal: prefijo `/portal-api` (auth y clientes vía BFF).
 
 ## Build
 

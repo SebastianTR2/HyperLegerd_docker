@@ -1,14 +1,22 @@
 import type { ClienteApiPayload } from '../types/api'
 import type { ClienteDetalleDto, ClienteFormDto, ClienteListItemDto } from '../types/dto'
+import { decodeIfBase64 } from './ledgerFieldDecode'
+import { parseNotasLedger } from './notasLedger'
 
 const TIPOS_DOC = ['CI', 'NIT', 'PASAPORTE'] as const
 
 /** Misma marca que api-middleware (baja vía UpdateAsset con estado INACTIVO). */
 export const MARCA_BAJA_LOGICA_API = '[baja-logica-api]'
 
-export function esClienteBajaLogica(detalle: { estadoCodigo: string; notas: string }): boolean {
+export function esClienteBajaLogica(detalle: {
+  estadoCodigo: string
+  notas: string
+  /** Notas tal como vienen del ledger (antes de limpiar); necesario para la marca de baja. */
+  notasLedger?: string
+}): boolean {
   if (detalle.estadoCodigo === 'DADO_DE_BAJA') return true
-  return detalle.estadoCodigo === 'INACTIVO' && detalle.notas.includes(MARCA_BAJA_LOGICA_API)
+  const src = detalle.notasLedger ?? detalle.notas
+  return detalle.estadoCodigo === 'INACTIVO' && src.includes(MARCA_BAJA_LOGICA_API)
 }
 
 export function estadoEtiqueta(estado: string): string {
@@ -70,29 +78,31 @@ export function apiRecordToDetalleDto(raw: unknown): ClienteDetalleDto | null {
     .replace(/\s+/g, '_')
   const estadoCodigo =
     estadoRaw === 'DADO_DE_BAJA' ? 'DADO_DE_BAJA' : estadoRaw === 'INACTIVO' ? 'INACTIVO' : 'ACTIVO'
-  const notas = String(r.notas ?? '')
-  const etiqueta =
-    estadoCodigo === 'INACTIVO' && notas.includes(MARCA_BAJA_LOGICA_API)
-      ? 'Dado de baja'
-      : estadoEtiqueta(estadoCodigo)
+  const notasLedger = String(r.notas ?? '')
+  const notasParsed = parseNotasLedger(notasLedger)
+  const esBajaLogica =
+    estadoCodigo === 'DADO_DE_BAJA' ||
+    (estadoCodigo === 'INACTIVO' && notasLedger.includes(MARCA_BAJA_LOGICA_API))
+  const etiqueta = esBajaLogica ? 'Dado de baja' : estadoEtiqueta(estadoCodigo)
   return {
     codigo: clienteId,
-    nombre: String(r.nombre ?? ''),
+    nombre: decodeIfBase64(String(r.nombre ?? '')),
     tipoDocumento: String(r.tipoDocumento ?? ''),
     numeroDocumento: String(r.numeroDocumento ?? ''),
     estadoCodigo,
     estadoEtiqueta: etiqueta,
     fechaAlta: String(r.fechaAlta ?? ''),
-    telefono: String(r.telefono ?? ''),
-    correo: String(r.email ?? ''),
-    notas,
+    telefono: decodeIfBase64(String(r.telefono ?? '')),
+    correo: decodeIfBase64(String(r.email ?? '')),
+    notas: notasParsed.notasNegocio,
+    informacionAuditoria: notasParsed.informacionAuditoria,
+    esBajaLogica,
   }
 }
 
 export function apiRecordToListItemDto(raw: unknown): ClienteListItemDto | null {
   const d = apiRecordToDetalleDto(raw)
   if (!d) return null
-  const esBajaLogica = esClienteBajaLogica({ estadoCodigo: d.estadoCodigo, notas: d.notas })
   return {
     codigo: d.codigo,
     documentoEtiqueta: `${d.tipoDocumento} ${d.numeroDocumento}`.trim(),
@@ -100,7 +110,7 @@ export function apiRecordToListItemDto(raw: unknown): ClienteListItemDto | null 
     estadoCodigo: d.estadoCodigo,
     estadoEtiqueta: d.estadoEtiqueta,
     fechaRegistro: d.fechaAlta,
-    esBajaLogica,
+    esBajaLogica: d.esBajaLogica,
   }
 }
 

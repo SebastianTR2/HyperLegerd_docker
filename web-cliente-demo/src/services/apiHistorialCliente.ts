@@ -1,4 +1,5 @@
 import { apiJson } from './apiClient'
+import { parseClienteDatos } from '../lib/apiClienteAdapter'
 import type { ClienteApi, HistorialClienteApi } from '../types/api'
 
 export async function fetchHistorialCliente(clienteId: string): Promise<HistorialClienteApi> {
@@ -39,7 +40,7 @@ export function operacionesAVista(h: HistorialClienteApi): HistorialFilaVista[] 
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   )
   return ordenadas.map((op) => {
-    const rec = op.record
+    const rec = op.record ? parseClienteDatos(op.record) : null
     const resumen = rec
       ? `${rec.nombre ?? ''} (${rec.estado ?? ''})`.trim() || op.txId
       : op.isDelete
@@ -50,7 +51,7 @@ export function operacionesAVista(h: HistorialClienteApi): HistorialFilaVista[] 
       timestamp: op.timestamp,
       isDelete: op.isDelete,
       resumen,
-      cliente: rec ?? null,
+      cliente: rec,
     }
   })
 }

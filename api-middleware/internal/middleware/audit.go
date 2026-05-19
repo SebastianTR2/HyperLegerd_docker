@@ -41,7 +41,10 @@ func AuditOperaciones() gin.HandlerFunc {
 		c.Writer.Header().Set("X-Operacion-Id", opID)
 
 		rutaEntrada := c.Request.URL.Path
-		actor := truncar(strings.TrimSpace(c.GetHeader(headerActorAudit)), 256)
+		actor := truncar(strings.TrimSpace(c.GetHeader("X-Actor-Name")), 256)
+		if actor == "" {
+			actor = truncar(strings.TrimSpace(c.GetHeader(headerActorAudit)), 256)
+		}
 
 		bitacora.RegistrarSolicitudRecibida(bitacora.EntradaBitacoraSolicitud{
 			OperacionID: opID,

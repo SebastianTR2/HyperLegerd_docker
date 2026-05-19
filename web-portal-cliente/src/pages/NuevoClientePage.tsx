@@ -10,9 +10,7 @@ import {
   MENSAJE_ACCESO_SERVICIO,
 } from '../lib/apiErrors'
 import { logErrorGuardar, logRegistroClienteExitoso, useSessionLog } from '../context/SessionLogContext'
-import { useSettings } from '../context/SettingsContext'
-import { ServicioNoConfigurado } from '../components/PortalServiceMessages'
-import { esSoloLectura } from '../lib/roleFromKey'
+import { useAuth } from '../context/AuthContext'
 
 function validar(f: ClienteFormDto): Partial<Record<keyof ClienteFormDto, string>> {
   const e: Partial<Record<keyof ClienteFormDto, string>> = {}
@@ -37,8 +35,7 @@ export default function NuevoClientePage() {
   const [exito, setExito] = useState<{ txId?: string } | null>(null)
   const navigate = useNavigate()
   const log = useSessionLog()
-  const { apiKey, isServiceConfigured } = useSettings()
-  const readOnly = esSoloLectura(apiKey)
+  const { readOnly } = useAuth()
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -63,14 +60,6 @@ export default function NuevoClientePage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  if (!isServiceConfigured) {
-    return (
-      <div className="mx-auto max-w-2xl space-y-4">
-        <ServicioNoConfigurado />
-      </div>
-    )
   }
 
   if (readOnly) {

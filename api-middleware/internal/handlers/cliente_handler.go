@@ -31,7 +31,13 @@ func generateSignature(c models.Cliente) string {
 	return fmt.Sprintf("SIG-%x", hash[:16])
 }
 
-// getRoleFromKey mapea la API Key al nombre del usuario y su rol para auditoría
+const (
+	headerActorName     = "X-Actor-Name"
+	headerActorRole     = "X-Actor-Role"
+	headerActorUsername = "X-Actor-Username"
+)
+
+// getRoleFromKey mapea la API Key al nombre del usuario y su rol para auditoría (fallback sin portal).
 func getRoleFromKey(key string) string {
 	switch key {
 	case os.Getenv("API_KEY_ADMIN"):
@@ -43,6 +49,36 @@ func getRoleFromKey(key string) string {
 	default:
 		return "Usuario Desconocido"
 	}
+}
+
+// prefijoAuditoriaOperador usa cabeceras del portal (X-Actor-*) o, si no vienen, la API key.
+func prefijoAuditoriaOperador(c *gin.Context) string {
+	name := strings.TrimSpace(c.GetHeader(headerActorName))
+	role := strings.TrimSpace(c.GetHeader(headerActorRole))
+	user := strings.TrimSpace(c.GetHeader(headerActorUsername))
+	if name != "" || role != "" || user != "" {
+		var parts []string
+		if name != "" {
+			parts = append(parts, name)
+		}
+		if role != "" {
+			parts = append(parts, role)
+		}
+		if user != "" {
+			parts = append(parts, user)
+		}
+		return "[actor] " + strings.Join(parts, " · ")
+	}
+	return "[" + getRoleFromKey(c.GetHeader("X-API-Key")) + "]"
+}
+
+func inyectarAuditoriaNotas(c *gin.Context, notas string) string {
+	pref := prefijoAuditoriaOperador(c)
+	notas = strings.TrimSpace(notas)
+	if notas == "" {
+		return pref
+	}
+	return pref + " " + notas
 }
 
 // RegistrarCliente maneja la creación de un nuevo asset de cliente en Fabric.
@@ -68,12 +104,9 @@ func RegistrarCliente(c *gin.Context) {
 	}
 	n = normalizado
 
-	// Inyectar usuario para auditoría in-ledger
-	apiKey := c.GetHeader("X-API-Key")
-	rol := getRoleFromKey(apiKey)
-	n.Notas = fmt.Sprintf("[%s] %s", rol, n.Notas)
+	n.Notas = inyectarAuditoriaNotas(c, n.Notas)
 
-	// APLICAR ENCODE (Privacidad) — desactivado temporalmente
+	// APLICAR ENCODE (Privacidad) — desactivado temporalmente (legibilidad en UI)
 	// n.Nombre = encodeField(n.Nombre)
 	// n.Email = encodeField(n.Email)
 	// n.Telefono = encodeField(n.Telefono)
@@ -257,10 +290,7 @@ func ActualizarCliente(c *gin.Context) {
 		return
 	}
 
-	// Inyectar usuario para auditoría in-ledger
-	apiKey := c.GetHeader("X-API-Key")
-	rol := getRoleFromKey(apiKey)
-	normalizado.Notas = fmt.Sprintf("[%s] %s", rol, normalizado.Notas)
+	normalizado.Notas = inyectarAuditoriaNotas(c, normalizado.Notas)
 
 	// APLICAR ENCODE (Privacidad) — desactivado temporalmente
 	// normalizado.Nombre = encodeField(normalizado.Nombre)
@@ -298,7 +328,7 @@ func ActualizarCliente(c *gin.Context) {
 // marcaBajaLogicaNotas identifica en notas una baja aplicada vía API (UpdateAsset), p. ej. cuando el estado queda INACTIVO.
 const marcaBajaLogicaNotas = "[baja-logica-api]"
 
-// DarBajaCliente aplica baja lógica vía UpdateAsset (mismo camino que PATCH), sin DeleteAsset ni BajaCliente en chaincode.
+// DarBajaCliente aplica baja lógica invocando BajaCliente en el chaincode (estado DADO_DE_BAJA).
 func DarBajaCliente(c *gin.Context) {
 	clienteId := strings.TrimSpace(c.Param("clienteId"))
 	if clienteId == "" {
@@ -337,35 +367,42 @@ func DarBajaCliente(c *gin.Context) {
 	}
 
 	roleStr := rolOperacionDesdeContexto(c)
-	audit := fmt.Sprintf("%s [%s] Baja lógica registrada (rol operación: %s)", marcaBajaLogicaNotas, time.Now().UTC().Format(time.RFC3339), roleStr)
-	notas := strings.TrimSpace(actual.Notas)
-	if notas != "" {
-		notas = notas + "\n" + audit
-	} else {
-		notas = audit
-	}
+	lineaAuditoria := lineaAuditoriaBaja(c, roleStr)
 
-	invokeUpdate := func(estado string) (*fabric.SubmitResult, error) {
-		return fabric.InvokeTransactionWithTxID(chaincode, "UpdateAsset",
-			actual.ClienteId, actual.Nombre, actual.TipoDocumento, actual.NumeroDocumento,
-			actual.FechaAlta, estado, actual.Telefono, actual.Email, notas,
-		)
+	// Estrategia dual: muchos despliegues no exponen BajaCliente o fallan con "failed to endorse"
+	// sin detalle; UpdateAsset(INACTIVO)+marca suele ser la vía compatible. Si falla, se intenta BajaCliente.
+	var result *fabric.SubmitResult
+	var errBaja error
+	result, errBaja = darBajaViaUpdateAssetInactivo(chaincode, actual, clienteId, lineaAuditoria)
+	if errBaja != nil && !esErrorClienteYaDeBaja(errBaja) {
+		var resultCC *fabric.SubmitResult
+		var errCC error
+		resultCC, errCC = fabric.InvokeTransactionWithTxID(chaincode, "BajaCliente", clienteId, lineaAuditoria)
+		if errCC == nil {
+			result = resultCC
+			errBaja = nil
+		} else {
+			errBaja = fmt.Errorf("baja vía UpdateAsset(INACTIVO): %v; baja vía BajaCliente: %w", errBaja, errCC)
+		}
 	}
-
-	result, err := invokeUpdate("DADO_DE_BAJA")
-	if err != nil && esErrorUpdateRechazaDadoDeBaja(err) {
-		result, err = invokeUpdate("INACTIVO")
-	}
-	if err != nil {
-		if strings.Contains(err.Error(), "CLIENTE_NO_EDITABLE") {
+	if errBaja != nil {
+		errMsg := extraerMensajeErrorFabric(errBaja)
+		if esErrorClienteYaDeBaja(errBaja) {
+			c.JSON(http.StatusConflict, models.RespuestaError{Ok: false, Codigo: "CLIENTE_YA_DADO_DE_BAJA", Mensaje: "El cliente ya fue dado de baja"})
+			return
+		}
+		if strings.Contains(errMsg, "CLIENTE_NO_EDITABLE") {
 			c.JSON(http.StatusConflict, models.RespuestaError{Ok: false, Codigo: "CLIENTE_NO_EDITABLE", Mensaje: "El cliente fue dado de baja y no admite modificaciones"})
 			return
 		}
-		if esErrorNoEncontrado(err) {
+		if esErrorNoEncontrado(errBaja) {
 			c.JSON(http.StatusNotFound, models.RespuestaError{Ok: false, Codigo: "NO_ENCONTRADO", Mensaje: "Cliente no encontrado en la Blockchain"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, models.RespuestaError{Ok: false, Codigo: "ERROR_FABRIC", Mensaje: "Error al registrar la baja en Blockchain: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, models.RespuestaError{
+			Ok: false, Codigo: "ERROR_FABRIC",
+			Mensaje: "Error al registrar la baja en Blockchain: " + errMsg,
+		})
 		return
 	}
 
@@ -376,13 +413,49 @@ func DarBajaCliente(c *gin.Context) {
 	})
 }
 
-func esErrorUpdateRechazaDadoDeBaja(err error) bool {
+func lineaAuditoriaBaja(c *gin.Context, roleStr string) string {
+	return fmt.Sprintf("%s %s [%s] Baja lógica registrada (rol operación: %s)",
+		marcaBajaLogicaNotas, prefijoAuditoriaOperador(c), time.Now().UTC().Format(time.RFC3339), roleStr)
+}
+
+// Respaldo si el chaincode desplegado no expone BajaCliente: INACTIVO + marca en notas (UpdateAsset rechaza DADO_DE_BAJA).
+func darBajaViaUpdateAssetInactivo(chaincode string, actual models.Cliente, clienteId string, lineaAuditoria string) (*fabric.SubmitResult, error) {
+	id := strings.TrimSpace(actual.ClienteId)
+	if id == "" {
+		id = strings.TrimSpace(clienteId)
+	}
+	notas := strings.TrimSpace(actual.Notas)
+	if notas != "" {
+		notas = notas + "\n" + lineaAuditoria
+	} else {
+		notas = lineaAuditoria
+	}
+	return fabric.InvokeTransactionWithTxID(chaincode, "UpdateAsset",
+		id, actual.Nombre, actual.TipoDocumento, actual.NumeroDocumento,
+		actual.FechaAlta, "INACTIVO", actual.Telefono, actual.Email, notas,
+	)
+}
+
+func esErrorClienteYaDeBaja(err error) bool {
 	if err == nil {
 		return false
 	}
-	s := strings.ToLower(err.Error())
-	return strings.Contains(s, "cliente_baja_via_endpoint") ||
-		strings.Contains(s, "solo se aplica mediante la operación de baja lógica")
+	return strings.Contains(strings.ToUpper(err.Error()), "CLIENTE_YA_DADO_DE_BAJA")
+}
+
+// extraerMensajeErrorFabric devuelve el detalle del chaincode si viene anidado en el error de endorsement.
+func extraerMensajeErrorFabric(err error) string {
+	if err == nil {
+		return ""
+	}
+	raw := err.Error()
+	if i := strings.Index(raw, "chaincode response"); i >= 0 {
+		return strings.TrimSpace(raw[i:])
+	}
+	if i := strings.Index(raw, "CLIENTE_"); i >= 0 {
+		return strings.TrimSpace(raw[i:])
+	}
+	return raw
 }
 
 func rolOperacionDesdeContexto(c *gin.Context) string {

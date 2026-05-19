@@ -57,5 +57,10 @@ channel-artifacts/
 priv_sk
 **/priv_sk
 
+# --- Portal API (SQLite local) ---
+web-portal-api/data/
+**/portal.db
+**/portal.db-*
+
 # --- SO ---
 .DS_Store

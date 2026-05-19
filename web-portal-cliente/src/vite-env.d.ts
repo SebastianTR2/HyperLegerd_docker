@@ -1,8 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_API_TARGET?: string
-  readonly VITE_PORTAL_API_KEY?: string
+  readonly VITE_PORTAL_API_TARGET?: string
 }
 
 interface ImportMeta {

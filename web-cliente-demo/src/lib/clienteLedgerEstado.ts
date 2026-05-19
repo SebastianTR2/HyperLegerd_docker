@@ -7,7 +7,7 @@ export type ClienteLedgerEstadoResumen = 'activo' | 'baja' | 'inactivo'
 
 export function clienteLedgerEstadoResumen(c: ClienteApi): ClienteLedgerEstadoResumen {
   const raw = (c.estado ?? '').toUpperCase().replace(/\s+/g, '_')
-  const notas = c.notas ?? ''
+  const notas = c.notasLedger ?? c.notas ?? ''
   if (raw === 'DADO_DE_BAJA') return 'baja'
   if (raw === 'INACTIVO' && notas.includes(MARCA_BAJA_LOGICA)) return 'baja'
   if (raw === 'ACTIVO') return 'activo'

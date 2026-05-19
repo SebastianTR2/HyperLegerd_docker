@@ -1,4 +1,4 @@
-import { resolvePortalApiKey } from '../lib/settings'
+import { clearAuthToken, getAuthToken } from '../lib/authStorage'
 import type { RespuestaError } from '../types/api'
 
 export class ApiHttpError extends Error {
@@ -21,25 +21,38 @@ function parseJsonSafe(text: string): unknown {
   }
 }
 
-export const API_PREFIX = '/api'
+export const PORTAL_API_PREFIX = '/portal-api'
 
-export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const url = path.startsWith('http') ? path : `${API_PREFIX}${path.startsWith('/') ? path : `/${path}`}`
+type PortalFetchInit = RequestInit & { skipAuth?: boolean }
+
+export async function portalFetch(path: string, init: PortalFetchInit = {}): Promise<Response> {
+  const url = path.startsWith('http')
+    ? path
+    : `${PORTAL_API_PREFIX}${path.startsWith('/') ? path : `/${path}`}`
   const headers = new Headers(init.headers ?? undefined)
-  const key = resolvePortalApiKey()
-  if (key) {
-    headers.set('X-API-Key', key)
+  if (!init.skipAuth) {
+    const token = getAuthToken()
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`)
+    }
   }
   headers.set('Accept', 'application/json')
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
-  const { headers: _h, ...rest } = init
-  return fetch(url, { ...rest, headers })
+  const { headers: _h, skipAuth: _s, ...rest } = init
+  const res = await fetch(url, { ...rest, headers })
+  if (res.status === 401 && !init.skipAuth) {
+    clearAuthToken()
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      window.location.assign('/login')
+    }
+  }
+  return res
 }
 
-export async function apiJson<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await apiFetch(path, init)
+export async function portalJson<T>(path: string, init: PortalFetchInit = {}): Promise<T> {
+  const res = await portalFetch(path, init)
   const text = await res.text()
   const parsed = text ? parseJsonSafe(text) : null
 
@@ -51,6 +64,8 @@ export async function apiJson<T>(path: string, init: RequestInit = {}): Promise<
         errBody = parsed as RespuestaError
       } else if (typeof o.codigo === 'string' && typeof o.mensaje === 'string') {
         errBody = { ok: false, codigo: o.codigo, mensaje: o.mensaje }
+      } else if (typeof o.mensaje === 'string') {
+        errBody = { ok: false, codigo: 'ERROR', mensaje: o.mensaje }
       }
     }
     throw new ApiHttpError(res.status, errBody, errBody?.mensaje)
@@ -58,3 +73,7 @@ export async function apiJson<T>(path: string, init: RequestInit = {}): Promise<
 
   return parsed as T
 }
+
+/** Alias para servicios de clientes (mismo BFF). */
+export const apiFetch = portalFetch
+export const apiJson = portalJson

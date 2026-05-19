@@ -1,7 +1,10 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { SettingsProvider } from './context/SettingsContext'
+import { AuthProvider } from './context/AuthContext'
 import { SessionLogProvider } from './context/SessionLogContext'
 import { AppLayout } from './layouts/AppLayout'
+import { ProtectedRoute } from './routes/ProtectedRoute'
+import { WriteRoute } from './routes/WriteRoute'
+import LoginPage from './pages/LoginPage'
 import InicioPage from './pages/InicioPage'
 import ClientesPage from './pages/ClientesPage'
 import NuevoClientePage from './pages/NuevoClientePage'
@@ -20,21 +23,26 @@ export default function App() {
       }}
     >
       <BrowserRouter>
-        <SettingsProvider>
+        <AuthProvider>
           <SessionLogProvider>
             <Routes>
-              <Route element={<AppLayout />}>
-                <Route index element={<InicioPage />} />
-                <Route path="clientes" element={<ClientesPage />} />
-                <Route path="clientes/nuevo" element={<NuevoClientePage />} />
-                <Route path="clientes/:clienteId/editar" element={<EditarClientePage />} />
-                <Route path="clientes/:clienteId" element={<ClienteDetallePage />} />
-                <Route path="historial" element={<HistorialPage />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route element={<ProtectedRoute />}>
+                <Route element={<AppLayout />}>
+                  <Route index element={<InicioPage />} />
+                  <Route path="clientes" element={<ClientesPage />} />
+                  <Route element={<WriteRoute />}>
+                    <Route path="clientes/nuevo" element={<NuevoClientePage />} />
+                    <Route path="clientes/:clienteId/editar" element={<EditarClientePage />} />
+                  </Route>
+                  <Route path="clientes/:clienteId" element={<ClienteDetallePage />} />
+                  <Route path="historial" element={<HistorialPage />} />
+                </Route>
               </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </SessionLogProvider>
-        </SettingsProvider>
+        </AuthProvider>
       </BrowserRouter>
     </div>
   )

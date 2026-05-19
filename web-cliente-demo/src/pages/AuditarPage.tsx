@@ -11,6 +11,9 @@ import {
   type HistorialFilaVista,
   type LineaTiempoRespuesta,
 } from '../services/apiHistorialCliente'
+import { parseClienteDatos } from '../lib/apiClienteAdapter'
+import { clienteFilasLegibles, displayClienteField } from '../lib/clienteDisplay'
+import { decodeIfBase64 } from '../lib/ledgerFieldDecode'
 
 // NUEVO: Datos de identidad para auditores (se inyectan por el backend) BORRAR DESPUES PARA ORG2
 const USUARIOS_DETALLE: Record<string, { nombre: string, cargo: string, depto: string, matricula: string, bio: string }> = {
@@ -66,32 +69,9 @@ type FilaTabla = {
   cliente: any
 }
 
-
 function str(v: unknown): string {
   if (v === null || v === undefined) return ''
   return String(v)
-}
-
-// NUEVO: Ayudantes para ENCODE / DECODE
-function isBase64(str: string): boolean {
-  if (!str || str.length % 4 !== 0 || str.includes(' ')) return false
-  try {
-    return btoa(atob(str)) === str
-  } catch (err) {
-    return false
-  }
-}
-
-function decodeIfNeeded(val: unknown): string {
-  const s = str(val)
-  if (isBase64(s)) {
-    try {
-      return atob(s)
-    } catch {
-      return s
-    }
-  }
-  return s
 }
 
 function obtenerCambios(viejo: any, nuevo: any) {
@@ -124,9 +104,17 @@ function filasDesdeDatos(d: AuditoriaCombinadaDatos): FilaTabla[] {
       if (ev.payload) {
         fullObj = typeof ev.payload === 'string' ? JSON.parse(ev.payload) : ev.payload
 
-        codigo = str(fullObj.clientId || fullObj.clienteId || fullObj.id || fullObj.codigo || '—')
-        nombre = str(fullObj.nombre || fullObj.Nombre || fullObj.name || '—')
-        estado = str(fullObj.estado || fullObj.Estado || fullObj.status || '—')
+        const parsed = parseClienteDatos(fullObj)
+        if (parsed) {
+          fullObj = parsed
+          codigo = parsed.clienteId
+          nombre = parsed.nombre
+          estado = parsed.estado
+        } else {
+          codigo = str(fullObj.clientId || fullObj.clienteId || fullObj.id || fullObj.codigo || '—')
+          nombre = str(fullObj.nombre || fullObj.Nombre || fullObj.name || '—')
+          estado = str(fullObj.estado || fullObj.Estado || fullObj.status || '—')
+        }
       }
     } catch (err) {
       console.error("Error parseando payload de evento:", err)
@@ -157,8 +145,8 @@ function filasDesdeDatos(d: AuditoriaCombinadaDatos): FilaTabla[] {
 
     out.push({
       id: `e-${n}`,
-      codigo: decodeIfNeeded(codigo),
-      nombre: decodeIfNeeded(nombre),
+      codigo: decodeIfBase64(codigo),
+      nombre: decodeIfBase64(nombre),
       fecha: ev.timestamp,
       estado: estado !== '—' ? estado : 'LEDGER_TX',
       bloque: String(ev.blockNumber),
@@ -516,7 +504,7 @@ export default function AuditarPage() {
         const selectedAcc = lineaTiempo.acciones[selectedAccionIdx]
         const opActual = historialOps[selectedAccionIdx]
         const opAnterior = selectedAccionIdx > 0 ? historialOps[selectedAccionIdx - 1] : null
-        const campos = Object.keys(opActual?.cliente ?? {})
+        const campos = clienteFilasLegibles(opActual?.cliente).map((r) => r.key)
 
         const getAutorDeNotas = (notas?: string) => {
           if (!notas) return 'Sistema'
@@ -572,9 +560,12 @@ export default function AuditarPage() {
                       const isSelected = selectedAccionIdx === idx
                       const opAct = historialOps[idx]
                       const opAnt = idx > 0 ? historialOps[idx - 1] : null
-                      const countModificados = Object.keys(opAct?.cliente ?? {}).filter(campo =>
-                        opAnt !== null &&
-                        String(opAnt?.cliente?.[campo] ?? '') !== String(opAct?.cliente?.[campo] ?? '')
+                      const countModificados = clienteFilasLegibles(opAct?.cliente).filter(
+                        ({ key, value }) =>
+                          opAnt !== null &&
+                          String(
+                            clienteFilasLegibles(opAnt?.cliente).find((r) => r.key === key)?.value ?? '',
+                          ) !== String(value ?? ''),
                       ).length
 
                       return (
@@ -669,8 +660,8 @@ export default function AuditarPage() {
                             const valActual = opActual?.cliente?.[campo]
                             const valAnterior = opAnterior?.cliente?.[campo]
                             
-                            const actualStr = decodeIfNeeded(valActual)
-                            const anteriorStr = decodeIfNeeded(valAnterior)
+                            const actualStr = displayClienteField(campo, valActual)
+                            const anteriorStr = displayClienteField(campo, valAnterior)
                             
                             const cambió = opAnterior !== null && String(valAnterior ?? '') !== String(valActual ?? '')
 

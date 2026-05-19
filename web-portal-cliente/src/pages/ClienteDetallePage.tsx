@@ -7,13 +7,11 @@ import {
   logTechnicalApiFailure,
   mensajeClienteNoEncontrado,
 } from '../lib/apiErrors'
-import { AccesoServicioBloqueado, ServicioNoConfigurado } from '../components/PortalServiceMessages'
-import { Card, Button, Badge, Modal } from '../components/ui'
+import { AccesoServicioBloqueado } from '../components/PortalServiceMessages'
+import { Card, Button, Badge, Modal, Accordion } from '../components/ui'
 import { formatDisplayDate } from '../lib/formatDate'
 import { logClienteBaja, logConsultaCliente, useSessionLog } from '../context/SessionLogContext'
-import { useSettings } from '../context/SettingsContext'
-import { esSoloLectura } from '../lib/roleFromKey'
-import { esClienteBajaLogica } from '../lib/mappers'
+import { useAuth } from '../context/AuthContext'
 
 export default function ClienteDetallePage() {
   const { clienteId: rawId } = useParams()
@@ -31,8 +29,7 @@ export default function ClienteDetallePage() {
   const [bajaError, setBajaError] = useState<string | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const log = useSessionLog()
-  const { apiKey, isServiceConfigured } = useSettings()
-  const readOnly = esSoloLectura(apiKey)
+  const { readOnly } = useAuth()
 
   useEffect(() => {
     const st = location.state as { flashCliente?: string } | null
@@ -52,7 +49,7 @@ export default function ClienteDetallePage() {
   }, [clienteId, navigate, queryStr])
 
   function recargarDetalle() {
-    if (!clienteId || !isServiceConfigured) return
+    if (!clienteId) return
     consultarClienteDesdeApi(clienteId)
       .then((d) => {
         if (d) {
@@ -71,13 +68,6 @@ export default function ClienteDetallePage() {
 
   useEffect(() => {
     if (!clienteId) return
-    if (!isServiceConfigured) {
-      setLoading(false)
-      setData(null)
-      setNotFound(false)
-      setAccessBlocked(false)
-      return
-    }
     let ok = true
     setLoading(true)
     setNotFound(false)
@@ -113,21 +103,10 @@ export default function ClienteDetallePage() {
     return () => {
       ok = false
     }
-  }, [clienteId, isServiceConfigured])
+  }, [clienteId])
 
   if (!clienteId) {
     return <p className="text-sm text-[#6B7280]">Indique un código de cliente válido.</p>
-  }
-
-  if (!isServiceConfigured) {
-    return (
-      <div className="mx-auto max-w-lg space-y-4">
-        <ServicioNoConfigurado />
-        <Link className="text-sm text-[#D97706] hover:underline" to="/clientes">
-          Volver al listado
-        </Link>
-      </div>
-    )
   }
 
   if (loading) {
@@ -158,7 +137,7 @@ export default function ClienteDetallePage() {
     )
   }
 
-  const esBaja = esClienteBajaLogica({ estadoCodigo: data.estadoCodigo, notas: data.notas })
+  const esBaja = data.esBajaLogica
   const badgeTone =
     data.estadoCodigo === 'ACTIVO' ? 'success' : esBaja ? 'danger' : 'neutral'
 
@@ -209,6 +188,16 @@ export default function ClienteDetallePage() {
             <dd className="mt-1 text-sm text-[#6B7280]">{data.notas || '—'}</dd>
           </div>
         </dl>
+
+        {data.informacionAuditoria ? (
+          <div className="mt-4 border-t border-[#E8E1D8] pt-4">
+            <Accordion title="Información de auditoría">
+              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-[#6B7280]">
+                {data.informacionAuditoria}
+              </pre>
+            </Accordion>
+          </div>
+        ) : null}
 
         <div className="mt-6 flex flex-wrap gap-2 border-t border-[#E8E1D8] pt-4">
           <Link to="/clientes">

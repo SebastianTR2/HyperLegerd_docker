@@ -16,6 +16,10 @@ type Config struct {
 	APIKeyIntegrador  string
 	APIKeyLectura     string
 	JWTExpiry         time.Duration
+	// UsuariosAdminFile apunta al YAML con las cuentas humanas de la
+	// consola del puente (web-cliente-demo). Si está vacío o no existe,
+	// los endpoints /admin/* responderán 503 hasta que se configure.
+	UsuariosAdminFile string
 }
 
 func Load() Config {
@@ -33,8 +37,9 @@ func Load() Config {
 		MiddlewareURL:    strings.TrimRight(envOr("API_MIDDLEWARE_URL", "http://127.0.0.1:3000"), "/"),
 		APIKeyAdmin:      envOr("API_KEY_ADMIN", "sec-admin"),
 		APIKeyIntegrador: envOr("API_KEY_INTEGRADOR", "sec-int"),
-		APIKeyLectura:    envOr("API_KEY_LECTURA", "sec-lect"),
-		JWTExpiry:        time.Duration(expHours) * time.Hour,
+		APIKeyLectura:     envOr("API_KEY_LECTURA", "sec-lect"),
+		JWTExpiry:         time.Duration(expHours) * time.Hour,
+		UsuariosAdminFile: envOr("USUARIOS_ADMIN_FILE", "./config/usuarios-admin.yaml"),
 	}
 }
 

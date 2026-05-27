@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { Fragment, useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSettings } from '../context/SettingsContext'
 import { describeApiError } from '../lib/apiErrorMessage'
@@ -14,6 +14,7 @@ import {
 import { parseClienteDatos } from '../lib/apiClienteAdapter'
 import { clienteFilasLegibles, displayClienteField } from '../lib/clienteDisplay'
 import { decodeIfBase64 } from '../lib/ledgerFieldDecode'
+import { autorRolDisplayDesdeNotas } from '../lib/notasLedger'
 
 // NUEVO: Datos de identidad para auditores (se inyectan por el backend) BORRAR DESPUES PARA ORG2
 const USUARIOS_DETALLE: Record<string, { nombre: string, cargo: string, depto: string, matricula: string, bio: string }> = {
@@ -74,6 +75,17 @@ function str(v: unknown): string {
   return String(v)
 }
 
+/** Color del indicador en tabla según rol mostrado en «Autor / Rol». */
+function colorIndicadorAutor(autor: string): string {
+  const a = autor.toLowerCase()
+  if (a.includes('admin') || a.includes('supervisor') || a.includes('carlos')) return 'bg-amber-400'
+  if (a.includes('integrador') || a.includes('trabajador') || a.includes('operador') || a.includes('ana')) {
+    return 'bg-indigo-400'
+  }
+  if (a.includes('lectura') || a.includes('auditor') || a.includes('pedro')) return 'bg-slate-400'
+  return 'bg-slate-400'
+}
+
 function obtenerCambios(viejo: any, nuevo: any) {
   const cambios: Record<string, { anterior: any; nuevo: any }> = {}
   const todosLosCampos = new Set([...Object.keys(viejo || {}), ...Object.keys(nuevo || {})])
@@ -120,21 +132,9 @@ function filasDesdeDatos(d: AuditoriaCombinadaDatos): FilaTabla[] {
       console.error("Error parseando payload de evento:", err)
     }
 
-    // Extraer autor de las notas
-    let autor = 'Sistema'
-    if (fullObj.notas && typeof fullObj.notas === 'string') {
-      if (fullObj.notas.startsWith('[')) {
-        const match = fullObj.notas.match(/^\[(.*?)\]/)
-        if (match) autor = match[1]
-      } else {
-        // Inferencia para registros basados en la etapa del script
-        const n = fullObj.notas.toUpperCase()
-        if (n.includes('ETAPA 1') || n.includes('REGISTRADO')) autor = 'Encargado de Almacén'
-        else if (n.includes('ETAPA 2') || n.includes('PRODUCCION')) autor = 'Operador de Planta'
-        else if (n.includes('ETAPA 3') || n.includes('CALIDAD')) autor = 'Inspector de Calidad'
-        else if (n.includes('ETAPA 4') || n.includes('SELLADO')) autor = 'Supervisor General'
-      }
-    }
+    const autor = autorRolDisplayDesdeNotas(
+      typeof fullObj.notas === 'string' ? fullObj.notas : fullObj.notasLedger,
+    )
 
     // Extraer firma digital de negocio si existe
     let firmaNegocio = ev.txId // Default a TXID
@@ -248,6 +248,11 @@ export default function AuditarPage() {
 
   const filas = useMemo(() => {
     let list = datos ? filasDesdeDatos(datos) : []
+    // Excluir entidades del legado "borradores" (claves _DRAFT y _REV_N).
+    list = list.filter((r) => {
+      const c = (r.codigo || '').toUpperCase()
+      return !c.endsWith('_DRAFT') && !/_REV_\d+$/.test(c)
+    })
     if (busquedaId.trim()) {
       const q = busquedaId.toLowerCase().trim()
       list = list.filter(r => r.codigo.toLowerCase().includes(q))
@@ -258,6 +263,61 @@ export default function AuditarPage() {
     }
     return list
   }, [datos, busquedaId, busquedaTxId])
+
+  // Agrupación: 1 fila por clienteId. Cada grupo recuerda en qué índices
+  // del array plano `filas` están sus eventos para poder reabrir el modal
+  // de detalle (que usa `selectedIdx`).
+  type GrupoCliente = {
+    codigo: string
+    nombre: string
+    fechaUltima: string
+    autorUltimo: string
+    estadoUltimo: string
+    eventos: Array<{ fila: FilaTabla; idxPlano: number }>
+  }
+
+  const grupos = useMemo<GrupoCliente[]>(() => {
+    const map = new Map<string, GrupoCliente>()
+    filas.forEach((fila, idx) => {
+      const key = fila.codigo || '—'
+      const ev = { fila, idxPlano: idx }
+      const g = map.get(key)
+      if (!g) {
+        map.set(key, {
+          codigo: key,
+          nombre: fila.nombre,
+          fechaUltima: fila.fecha,
+          autorUltimo: fila.autor,
+          estadoUltimo: fila.estado,
+          eventos: [ev],
+        })
+      } else {
+        g.eventos.push(ev)
+        if (new Date(fila.fecha).getTime() > new Date(g.fechaUltima).getTime()) {
+          g.fechaUltima = fila.fecha
+          g.autorUltimo = fila.autor
+          g.estadoUltimo = fila.estado
+          g.nombre = fila.nombre
+        }
+      }
+    })
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(b.fechaUltima).getTime() - new Date(a.fechaUltima).getTime(),
+    )
+  }, [filas])
+
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
+  const toggleExpandido = useCallback((codigo: string) => {
+    setExpandidos((prev) => {
+      const next = new Set(prev)
+      if (next.has(codigo)) {
+        next.delete(codigo)
+      } else {
+        next.add(codigo)
+      }
+      return next
+    })
+  }, [])
 
   const onCopiar = (texto: string) => {
     navigator.clipboard.writeText(texto)
@@ -506,22 +566,7 @@ export default function AuditarPage() {
         const opAnterior = selectedAccionIdx > 0 ? historialOps[selectedAccionIdx - 1] : null
         const campos = clienteFilasLegibles(opActual?.cliente).map((r) => r.key)
 
-        const getAutorDeNotas = (notas?: string) => {
-          if (!notas) return 'Sistema'
-          if (notas.startsWith('[')) {
-            const match = notas.match(/^\[(.*?)\]/)
-            if (match) return match[1]
-          } else {
-            const n = notas.toUpperCase()
-            if (n.includes('ETAPA 1') || n.includes('REGISTRADO')) return 'Encargado de Almacén'
-            if (n.includes('ETAPA 2') || n.includes('PRODUCCION')) return 'Operador de Planta'
-            if (n.includes('ETAPA 3') || n.includes('CALIDAD')) return 'Inspector de Calidad'
-            if (n.includes('ETAPA 4') || n.includes('SELLADO')) return 'Supervisor General'
-          }
-          return 'Sistema'
-        }
-
-        const selectedAutor = getAutorDeNotas(opActual?.cliente?.notas)
+        const selectedAutor = autorRolDisplayDesdeNotas(opActual?.cliente ?? undefined)
 
         return (
           <div
@@ -715,7 +760,7 @@ export default function AuditarPage() {
 
       {datos ? (
         <p className="text-xs text-muted">
-          HTTP: {datos.totalHttp} filas · Eventos cadena: {datos.totalEventos} · Tabla unificada: {filas.length} filas
+          HTTP: {datos.totalHttp} filas · Eventos cadena: {datos.totalEventos} · Clientes con actividad: {grupos.length}
         </p>
       ) : null}
 
@@ -723,95 +768,151 @@ export default function AuditarPage() {
         <table className="w-full text-left text-sm">
           <thead className="sticky top-0 z-10 border-b border-line bg-surface/95 text-xs uppercase text-muted backdrop-blur-sm">
             <tr>
+              <th className="w-8 px-2 py-2"></th>
               <th className="px-3 py-2 font-medium">Código</th>
               <th className="px-3 py-2 font-medium">Nombre</th>
-              <th className="px-3 py-2 font-medium">Fecha</th>
-              <th className="px-3 py-2 font-medium text-center">Bloque</th>
+              <th className="px-3 py-2 font-medium">Última actividad</th>
               <th className="px-3 py-2 font-medium">Autor / Rol</th>
               <th className="px-3 py-2 font-medium">Estado</th>
-              <th className="px-3 py-2 font-medium">Firma digital (TXID)</th>
-              <th className="px-3 py-2 font-medium">Enlace Criptográfico</th>
-              <th className="px-3 py-2 font-medium text-center">Acción</th>
+              <th className="px-3 py-2 font-medium text-center"># Cambios</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {filas.length === 0 && !loading ? (
+            {grupos.length === 0 && !loading ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-muted">
+                <td colSpan={7} className="px-4 py-8 text-center text-muted">
                   Pulse Consultar para cargar la auditoría de Blockchain (Ledger).
                 </td>
               </tr>
             ) : null}
-            {filas.map((r, i) => (
-              <tr key={r.id} className={`hover:bg-surface/40 transition-colors ${selectedIdx === i ? 'bg-accent/10' : ''}`}>
-                <td className="px-3 py-2 font-medium text-slate-100">{r.codigo}</td>
-                <td className="px-3 py-2 text-slate-300">{r.nombre}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-xs text-muted">{formatDemoDateTime(r.fecha)}</td>
-                <td className="px-3 py-2 text-center">
-                  <span className="rounded bg-accent/20 px-1.5 py-0.5 font-mono text-[10px] text-accent">
-                    {r.bloque}
-                  </span>
-                </td>
-                <td className="px-3 py-2">
-                  <div className="flex items-center gap-2 group">
-                    <div className="flex items-center gap-1.5">
-                      <div className={`h-1.5 w-1.5 rounded-full ${r.autor.includes('Carlos') ? 'bg-amber-400' :
-                          r.autor.includes('Ana') ? 'bg-indigo-400' : 'bg-slate-400'
-                        }`}></div>
-                      <span className="text-[11px] font-medium text-slate-200">{r.autor}</span>
-                    </div>
-                    {USUARIOS_DETALLE[r.autor] && (
-                      <button
-                        onClick={() => setSelectedUsuario(r.autor)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity rounded-md bg-accent/10 p-1 text-accent hover:bg-accent hover:text-white"
-                        title="Ver credencial de identidad"
-                      >
-                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 012-2h2a2 2 0 012 2v1m-6 0h6" /></svg>
-                      </button>
-                    )}
-                  </div>
-                </td>
-                <td className="px-3 py-2">
-                  <span className={`rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase ${r.estado.includes('ACTIVO') || r.estado.includes('exito') ? 'bg-emerald-500/20 text-emerald-400' :
-                      'bg-slate-500/20 text-slate-400'
-                    }`}>
-                    {r.estado}
-                  </span>
-                </td>
-                <td className="px-3 py-2 font-mono text-[10px] text-muted">
-                  <div className="flex items-center gap-2">
-                    <span>{r.firma.slice(0, 12)}…</span>
-                    <button
-                      onClick={() => onCopiar(r.firma)}
-                      className="rounded bg-surface p-1 hover:bg-accent/20 hover:text-accent transition-colors"
-                      title="Copiar Firma Digital"
-                    >
-                      <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
-                    </button>
-                  </div>
-                </td>
-                <td className="px-3 py-2 font-mono text-[10px] text-accent/80">
-                  <div className="flex items-center gap-2">
-                    <span>{r.enlace.slice(0, 16)}…</span>
-                    <button
-                      onClick={() => onCopiar(r.enlace)}
-                      className="rounded bg-surface p-1 hover:bg-accent/20 hover:text-accent transition-colors"
-                      title="Copiar Enlace Criptográfico"
-                    >
-                      <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
-                    </button>
-                  </div>
-                </td>
-                <td className="px-3 py-2 text-center">
-                  <button
-                    onClick={() => setSelectedIdx(selectedIdx === i ? null : i)}
-                    className="rounded-lg bg-accent/20 px-3 py-1 text-[10px] font-bold text-accent hover:bg-accent/30 transition-all uppercase"
+            {grupos.map((g) => {
+              const isOpen = expandidos.has(g.codigo)
+              return (
+                <Fragment key={g.codigo}>
+                  <tr
+                    className="cursor-pointer hover:bg-surface/40 transition-colors"
+                    onClick={() => toggleExpandido(g.codigo)}
                   >
-                    {selectedIdx === i ? 'Cerrar' : 'Ver Detalle'}
-                  </button>
-                </td>
-              </tr>
-            ))}
+                    <td className="px-2 py-2 text-center text-muted">
+                      <svg
+                        className={`mx-auto h-4 w-4 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </td>
+                    <td className="px-3 py-2 font-medium text-slate-100">{g.codigo}</td>
+                    <td className="px-3 py-2 text-slate-300">{g.nombre}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-xs text-muted">{formatDemoDateTime(g.fechaUltima)}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-1.5">
+                        <div className={`h-1.5 w-1.5 rounded-full ${colorIndicadorAutor(g.autorUltimo)}`}></div>
+                        <span className="text-[11px] font-medium text-slate-200">{g.autorUltimo}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={`rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase ${g.estadoUltimo.includes('ACTIVO') || g.estadoUltimo.includes('exito') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'}`}>
+                        {g.estadoUltimo}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <span className="inline-flex h-6 min-w-[28px] items-center justify-center rounded-full bg-accent/20 px-2 text-[10px] font-bold text-accent">
+                        {g.eventos.length}
+                      </span>
+                    </td>
+                  </tr>
+
+                  {isOpen && (
+                    <tr className="bg-surface/30">
+                      <td colSpan={7} className="px-0 py-0">
+                        <div className="overflow-hidden border-t border-line">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-surface/60 text-[10px] uppercase text-muted">
+                              <tr>
+                                <th className="px-3 py-1.5 font-medium">Fecha</th>
+                                <th className="px-3 py-1.5 font-medium text-center">Bloque</th>
+                                <th className="px-3 py-1.5 font-medium">Autor / Rol</th>
+                                <th className="px-3 py-1.5 font-medium">Estado</th>
+                                <th className="px-3 py-1.5 font-medium">Firma digital (TxID)</th>
+                                <th className="px-3 py-1.5 font-medium">Enlace criptográfico</th>
+                                <th className="px-3 py-1.5 font-medium text-center">Acción</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-line/60">
+                              {[...g.eventos]
+                                .sort((a, b) => new Date(a.fila.fecha).getTime() - new Date(b.fila.fecha).getTime())
+                                .map((ev, idxEnGrupo) => {
+                                  const r = ev.fila
+                                  const i = ev.idxPlano
+                                  const etiquetaCambio = idxEnGrupo === 0 ? 'Creado' : `Edición #${idxEnGrupo}`
+                                  return (
+                                    <tr
+                                      key={r.id}
+                                      className={`hover:bg-surface/60 ${selectedIdx === i ? 'bg-accent/10' : ''}`}
+                                    >
+                                      <td className="whitespace-nowrap px-3 py-1.5 text-muted">
+                                        <span className="mr-2 inline-block rounded bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold text-accent">
+                                          {etiquetaCambio}
+                                        </span>
+                                        {formatDemoDateTime(r.fecha)}
+                                      </td>
+                                      <td className="px-3 py-1.5 text-center">
+                                        <span className="rounded bg-accent/20 px-1.5 py-0.5 font-mono text-[10px] text-accent">{r.bloque}</span>
+                                      </td>
+                                      <td className="px-3 py-1.5">
+                                        <div className="flex items-center gap-1.5 group">
+                                          <div className={`h-1.5 w-1.5 rounded-full ${colorIndicadorAutor(r.autor)}`}></div>
+                                          <span className="text-[11px] font-medium text-slate-200">{r.autor}</span>
+                                          {USUARIOS_DETALLE[r.autor] && (
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); setSelectedUsuario(r.autor) }}
+                                              className="opacity-0 group-hover:opacity-100 transition-opacity rounded-md bg-accent/10 p-1 text-accent hover:bg-accent hover:text-white"
+                                              title="Ver credencial de identidad"
+                                            >
+                                              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 012-2h2a2 2 0 012 2v1m-6 0h6" /></svg>
+                                            </button>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-1.5">
+                                        <span className={`rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase ${r.estado.includes('ACTIVO') || r.estado.includes('exito') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'}`}>{r.estado}</span>
+                                      </td>
+                                      <td className="px-3 py-1.5 font-mono text-[10px] text-muted">
+                                        <div className="flex items-center gap-2">
+                                          <span>{r.firma.slice(0, 12)}…</span>
+                                          <button onClick={(e) => { e.stopPropagation(); onCopiar(r.firma) }} className="rounded bg-surface p-1 hover:bg-accent/20 hover:text-accent transition-colors" title="Copiar firma">
+                                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
+                                          </button>
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-1.5 font-mono text-[10px] text-accent/80">
+                                        <div className="flex items-center gap-2">
+                                          <span>{r.enlace.slice(0, 16)}…</span>
+                                          <button onClick={(e) => { e.stopPropagation(); onCopiar(r.enlace) }} className="rounded bg-surface p-1 hover:bg-accent/20 hover:text-accent transition-colors" title="Copiar enlace">
+                                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
+                                          </button>
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-1.5 text-center">
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); setSelectedIdx(selectedIdx === i ? null : i) }}
+                                          className="rounded-lg bg-accent/20 px-3 py-1 text-[10px] font-bold text-accent hover:bg-accent/30 transition-all uppercase"
+                                        >
+                                          {selectedIdx === i ? 'Cerrar' : 'Ver Detalle'}
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              )
+            })}
           </tbody>
         </table>
       </div>

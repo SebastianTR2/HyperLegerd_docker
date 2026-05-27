@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useSessionLog } from '../context/SessionLogContext'
-import { Card, Accordion } from '../components/ui'
+import { Card } from '../components/ui'
 import { formatDateTime } from '../lib/formatDate'
 
 type Merged =
-  | { kind: 'message'; at: string; id: string; variant: 'success' | 'error'; titulo: string; detalle?: string; ref?: string }
+  | { kind: 'message'; at: string; id: string; variant: 'success' | 'error'; titulo: string; detalle?: string }
   | { kind: 'activity'; at: string; id: string; variant: 'ok' | 'err' | 'info'; texto: string }
 
 export default function HistorialPage() {
@@ -20,7 +20,6 @@ export default function HistorialPage() {
         variant: m.variant,
         titulo: m.titulo,
         detalle: m.detalle,
-        ref: m.referenciaTecnica,
       })),
       ...activities.map((a) => ({
         kind: 'activity' as const,
@@ -57,13 +56,6 @@ export default function HistorialPage() {
                 >
                   <p className="font-medium">{row.titulo}</p>
                   {row.detalle ? <p className="mt-1 text-sm opacity-90">{row.detalle}</p> : null}
-                  {row.ref ? (
-                    <div className="mt-2">
-                      <Accordion title="Referencia de registro">
-                        <span className="break-all font-mono text-[11px] text-[#6B7280]">{row.ref}</span>
-                      </Accordion>
-                    </div>
-                  ) : null}
                   <p className="mt-2 text-xs text-[#6B7280]">{formatDateTime(row.at)}</p>
                 </li>
               ) : (

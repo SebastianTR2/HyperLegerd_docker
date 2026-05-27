@@ -46,18 +46,28 @@ func AuditOperaciones() gin.HandlerFunc {
 			actor = truncar(strings.TrimSpace(c.GetHeader(headerActorAudit)), 256)
 		}
 
+		t0 := time.Now()
+		c.Next()
+		dur := time.Since(t0).Milliseconds()
+
+		// Resolver tenant después de que XAPIKeyAuth lo haya seteado (si aplica).
+		tenantID := ""
+		if v, ok := c.Get(ContextAPITenant); ok {
+			if s, ok2 := v.(string); ok2 {
+				tenantID = s
+			}
+		}
+
+		// Registramos la solicitud (con tenant) al final para enriquecer la línea.
 		bitacora.RegistrarSolicitudRecibida(bitacora.EntradaBitacoraSolicitud{
 			OperacionID: opID,
+			Tenant:      tenantID,
 			Metodo:      c.Request.Method,
 			Ruta:        rutaEntrada,
 			Remoto:      c.ClientIP(),
 			UserAgent:   truncar(c.Request.UserAgent(), 512),
 			Actor:       actor,
 		})
-
-		t0 := time.Now()
-		c.Next()
-		dur := time.Since(t0).Milliseconds()
 
 		rol := ""
 		if v, ok := c.Get(ContextAPIRole); ok {
@@ -82,6 +92,7 @@ func AuditOperaciones() gin.HandlerFunc {
 
 		bitacora.RegistrarResultadoOperacion(bitacora.EntradaBitacoraResultado{
 			OperacionID: opID,
+			Tenant:      tenantID,
 			Metodo:      c.Request.Method,
 			Ruta:        rutaSalida,
 			CodigoHTTP:  st,

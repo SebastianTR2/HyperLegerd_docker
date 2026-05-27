@@ -1,0 +1,49 @@
+# Archivo REAL de cuentas de la consola del puente (web-cliente-demo).
+# Ver config/usuarios-admin.example.yaml para la documentación completa.
+#
+# Contraseñas de demo (NO usar en producción):
+#   ana    / ana-clientes-2026     (integrador @ clientes)
+#   carlos / carlos-admin-2026     (admin      @ clientes)
+#   lucia  / lucia-lectura-2026    (lectura    @ clientes)
+#   olga   / olga-agri-2026        (admin      @ agricultura)
+
+default_tenant: clientes
+
+tenants:
+  clientes:
+    nombre: "Demostraciones / clientes"
+    api_keys:
+      admin: sec-admin
+      integrador: sec-int
+      lectura: sec-lect
+  agricultura:
+    nombre: "Agricultura (canal aparte)"
+    api_keys:
+      admin: agri-admin-2026
+      integrador: agri-int-2026
+      lectura: agri-lect-2026
+
+usuarios:
+  - usuario: ana
+    nombre_completo: "Ana Pérez"
+    rol: integrador
+    tenant: clientes
+    contrasena_hash: "$2a$10$0cAh09Off1k6VnOVujyGr.ADfbBQ30vgNTWOj3XO9.loAajYpoAj."
+
+  - usuario: carlos
+    nombre_completo: "Carlos Mamani"
+    rol: admin
+    tenant: clientes
+    contrasena_hash: "$2a$10$d0FaFAodTRsKIgzrShabGe4cMpir2ftPI8rLJP4BNEEEsRuDWK//y"
+
+  - usuario: lucia
+    nombre_completo: "Lucía Auditora"
+    rol: lectura
+    tenant: clientes
+    contrasena_hash: "$2a$10$W3hr5X.znkXfeuPS6ZtZC.CYQlW0zBG4ZnV0X8fo3OZm3Y7Z51EaO"
+
+  - usuario: olga
+    nombre_completo: "Olga Roque"
+    rol: admin
+    tenant: agricultura
+    contrasena_hash: "$2a$10$YMAwVjbhD8oVerg3YD6OTuxVfF1lEaDfdS9JjXLgWbkOWKpvU/0de"

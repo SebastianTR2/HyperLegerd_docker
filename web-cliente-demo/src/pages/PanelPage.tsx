@@ -9,55 +9,47 @@ import { workspaceLabel } from '../lib/roles'
 import type { ClienteApi } from '../types/api'
 import { ClienteLedgerEstadoBadge } from '../components/ClienteLedgerEstadoBadge'
 
-const shortcutsBase = [
-  { to: '/clientes-registrados', label: 'Ver clientes registrados', desc: 'Listado desde GET /clientes' },
+const shortcuts = [
+  { to: '/clientes-registrados', label: 'Clientes en red', desc: 'Listado desde GET /clientes (solo lectura)' },
   { to: '/auditoria', label: 'Auditoría del puente', desc: 'HTTP + eventos cadena, exportación CSV/JSON' },
-  { to: '/historial', label: 'Revisar actividad', desc: 'Operaciones registradas en esta sesión' },
-  { to: '/trazabilidad', label: 'Trazas y TXID', desc: 'Línea de tiempo y comprobación técnica' },
-  { to: '/cuentas-visibles', label: 'Ver cuentas token visibles', desc: 'Estado en ledger' },
-  { to: '/tokens', label: 'Operaciones con tokens', desc: 'Emisión y transferencia vía API' },
   { to: '/consultas', label: 'Consultas', desc: 'Cliente por clienteId exacto' },
-  { to: '/registros', label: 'Consola / enlaces', desc: 'Portal operativo y resumen en red' },
-  { to: '/credenciales', label: 'Credenciales', desc: 'Rol y clave de acceso' },
+  { to: '/historial', label: 'Actividad de la sesión', desc: 'Operaciones observadas en esta sesión' },
+  { to: '/trazabilidad', label: 'Trazas y TXID', desc: 'Línea de tiempo y comprobación técnica' },
+  { to: '/credenciales', label: 'Perfil de sesión', desc: 'Usuario, tenant, rol y permisos' },
 ] as const
 
 export default function PanelPage() {
-  const { eventos, tokenOps, clientesLedger, clientesLedgerLoading, clientesLedgerError, clientesLedgerAccessDenied } =
+  const { eventos, clientesLedger, clientesLedgerLoading, clientesLedgerError, clientesLedgerAccessDenied } =
     useDemoStore()
-  const { mode, role, roleLabel, permissions } = useSettings()
+  const { role, roleLabel } = useSettings()
   const consultasCount = eventos.filter((e) => e.tipo === 'consulta').length
   const ultimos = [...clientesLedger].sort(
     (a, b) => new Date(b.fechaAlta).getTime() - new Date(a.fechaAlta).getTime(),
   ).slice(0, 6)
   const actividad = eventos.slice(0, 8)
-  const shortcuts = shortcutsBase.filter((s) => {
-    if (s.to === '/tokens' && !permissions.canEmitTokens) return false
-    return true
-  })
   const portalClienteUrl = getPortalClienteUrl()
   const workspace = workspaceLabel(role)
-  const dataSourceLabel = mode === 'api' ? 'API / red' : 'Sin API'
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <StatSummary
         totalClientesEnRed={clientesLedger.length}
-        tokenOpsCount={tokenOps.length}
+        tokenOpsCount={0}
         consultasCount={consultasCount}
         eventosCount={eventos.length}
-        showTokenCard={permissions.canEmitTokens}
-        dataSourceLabel={dataSourceLabel}
+        showTokenCard={false}
+        dataSourceLabel="API / red"
       />
 
-      {mode === 'api' && clientesLedgerAccessDenied ? (
+      {clientesLedgerAccessDenied ? (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/95 shadow-sm">
           <p>
             {clientesLedgerError?.trim()
               ? clientesLedgerError
-              : 'Falta la cabecera X-API-Key o la clave no coincide con el middleware. Configurá Credenciales en modo API.'}
+              : 'La sesión actual no tiene permiso para listar clientes. Verifique con un administrador.'}
           </p>
           <Link className="mt-2 inline-block text-xs font-medium text-accent hover:underline" to="/credenciales">
-            Abrir Credenciales
+            Ver perfil de sesión
           </Link>
         </div>
       ) : null}
@@ -65,9 +57,13 @@ export default function PanelPage() {
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-12 lg:items-stretch">
         <div className="flex min-h-0 flex-col gap-4 lg:col-span-3">
           <div className="rounded-2xl border border-line bg-elevated/90 p-4 shadow-card">
-            <h2 className="text-sm font-semibold text-slate-100">Panel administrativo</h2>
+            <h2 className="text-sm font-semibold text-slate-100">Espacio actual</h2>
             <p className="mt-1 text-xs text-muted">
               {workspace} · <span className="text-slate-300">{roleLabel}</span>
+            </p>
+            <p className="mt-3 text-xs text-muted">
+              Esta consola es un <strong>explorador audit-only</strong> del puente. Los altas, ediciones y bajas
+              de clientes se realizan en el portal del cliente.
             </p>
             <ul className="mt-3 space-y-2">
               <li>
@@ -78,7 +74,7 @@ export default function PanelPage() {
                   className="block rounded-xl border border-accent/25 bg-accent/5 px-3 py-2 transition-colors hover:border-accent/40 hover:bg-accent/10"
                 >
                   <span className="text-sm font-medium text-slate-200">Abrir Portal de Cliente</span>
-                  <span className="mt-0.5 block text-xs text-muted">Registro operativo de clientes</span>
+                  <span className="mt-0.5 block text-xs text-muted">Registro y edición operativa</span>
                 </a>
               </li>
               {shortcuts.map((s) => (
@@ -97,18 +93,15 @@ export default function PanelPage() {
           <div className="rounded-2xl border border-line bg-elevated/90 p-4 shadow-card">
             <h2 className="text-sm font-semibold text-slate-100">Origen de datos</h2>
             <p className="mt-2 text-xs text-muted">
-              {mode === 'api'
-                ? 'Las listas de clientes se obtienen del middleware (proxy /api) y del ledger cuando la red responde.'
-                : 'Sin API: el panel de clientes vacío hasta conectar credenciales y modo API en Credenciales.'}
+              Las listas se obtienen del <code className="font-mono">api-middleware</code> a través del BFF
+              autenticado por JWT. Nada se guarda local; cada refresco vuelve a leer del ledger.
             </p>
             <div className="mt-3 flex items-center gap-2 rounded-xl border border-line bg-surface/50 px-3 py-2">
               <span className="relative flex h-2.5 w-2.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success/35 opacity-75" />
                 <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success" />
               </span>
-              <span className="text-xs text-slate-300">
-                {mode === 'api' ? 'Conexión API (X-API-Key vía proxy)' : 'Configure API en Credenciales'}
-              </span>
+              <span className="text-xs text-slate-300">Sesión autenticada · proxy BFF activo</span>
             </div>
           </div>
         </div>
@@ -157,10 +150,10 @@ export default function PanelPage() {
             </div>
             <div className="shrink-0 border-t border-line p-3">
               <Link
-                to={permissions.canRegisterClients ? '/clientes-registrados' : '/consultas'}
+                to="/clientes-registrados"
                 className="block w-full rounded-xl border border-line bg-surface/60 py-2 text-center text-xs font-medium text-slate-300 transition-colors hover:bg-elevated hover:text-slate-100"
               >
-                {permissions.canRegisterClients ? 'Ver todos los clientes' : 'Ir a consultas'}
+                Ver todos los clientes
               </Link>
             </div>
           </div>

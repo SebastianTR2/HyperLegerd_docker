@@ -8,17 +8,19 @@ import (
 type EntradaBitacoraSolicitud struct {
 	Timestamp   time.Time `json:"timestamp"`
 	OperacionID string    `json:"operacionId"`
+	Tenant      string    `json:"tenant,omitempty"`
 	Metodo      string    `json:"metodo"`
 	Ruta        string    `json:"ruta"`
 	Remoto      string    `json:"remoto"`
-	UserAgent string `json:"userAgent,omitempty"`
-	Actor     string `json:"actor,omitempty"`
+	UserAgent   string    `json:"userAgent,omitempty"`
+	Actor       string    `json:"actor,omitempty"`
 }
 
 // EntradaBitacoraResultado registra el cierre de una operación HTTP (hito 2.8).
 type EntradaBitacoraResultado struct {
 	Timestamp   time.Time `json:"timestamp"`
 	OperacionID string    `json:"operacionId"`
+	Tenant      string    `json:"tenant,omitempty"`
 	Metodo      string    `json:"metodo"`
 	Ruta        string    `json:"ruta"`
 	CodigoHTTP  int       `json:"codigoHttp"`

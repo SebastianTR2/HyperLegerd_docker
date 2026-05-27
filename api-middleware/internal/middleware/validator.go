@@ -106,5 +106,11 @@ func omitirValidacionOpenAPI(raw string) bool {
 	if strings.HasPrefix(low, "/auditoria/") || strings.HasPrefix(low, "/api/auditoria/") {
 		return true
 	}
+	// /datos/* es la API genérica multi-tenant (dato_cc). El payload es JSON
+	// libre por diseño, por lo que se valida en el handler en vez de en el
+	// contrato OpenAPI.
+	if low == "/datos" || strings.HasPrefix(low, "/datos/") {
+		return true
+	}
 	return false
 }

@@ -3,15 +3,19 @@ import { ActivityFeed } from '../components/ActivityFeed'
 import { useDemoStore } from '../context/DemoStoreContext'
 import type { DemoEventType } from '../types/demo'
 
-const filtros: { id: DemoEventType | 'all'; label: string }[] = [
+// Filtros del historial: la consola del puente es audit-only y no maneja
+// tokens, por lo que ocultamos los filtros de token_emitido/transferido.
+const filtrosHistorialLista: { id: DemoEventType | 'all'; label: string }[] = [
   { id: 'all', label: 'Todos' },
   { id: 'registro_creado', label: 'Alta' },
   { id: 'registro_editado', label: 'Edición' },
   { id: 'registro_eliminado', label: 'Baja' },
-  { id: 'token_emitido', label: 'Token emitido' },
-  { id: 'token_transferido', label: 'Transferencia' },
   { id: 'consulta', label: 'Consultas' },
 ]
+
+function filtrosHistorial(): typeof filtrosHistorialLista {
+  return filtrosHistorialLista
+}
 
 export default function HistorialPage() {
   const { eventos } = useDemoStore()
@@ -25,7 +29,7 @@ export default function HistorialPage() {
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col gap-4">
       <div className="flex shrink-0 flex-wrap gap-2">
-        {filtros.map((f) => (
+        {filtrosHistorial().map((f) => (
           <button
             key={f.id}
             type="button"

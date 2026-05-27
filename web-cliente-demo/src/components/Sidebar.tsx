@@ -1,7 +1,6 @@
 import type { ComponentType } from 'react'
 import { NavLink } from 'react-router-dom'
-import { useSettings } from '../context/SettingsContext'
-import { routeAllowedForRole, type AppRoutePath } from '../lib/roles'
+import type { AppRoutePath } from '../lib/roles'
 
 interface SidebarProps {
   mobileOpen: boolean
@@ -17,20 +16,15 @@ type NavItem = {
 
 const items: NavItem[] = [
   { to: '/', label: 'Panel', icon: IconGrid, end: true },
-  { to: '/registros', label: 'Consola / enlaces', icon: IconUsers },
-  { to: '/tokens', label: 'Tokens', icon: IconCoin },
-  { to: '/cuentas-visibles', label: 'Cuentas token visibles', icon: IconEye },
+  { to: '/clientes-registrados', label: 'Clientes en red', icon: IconList },
   { to: '/consultas', label: 'Consultas', icon: IconSearch },
-  { to: '/clientes-registrados', label: 'Clientes registrados', icon: IconList },
   { to: '/auditoria', label: 'Auditar', icon: IconShield },
   { to: '/historial', label: 'Historial', icon: IconClock },
   { to: '/trazabilidad', label: 'Trazabilidad', icon: IconFlow },
-  { to: '/credenciales', label: 'Credenciales', icon: IconKey },
+  { to: '/credenciales', label: 'Perfil', icon: IconKey },
 ]
 
 export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
-  const { role } = useSettings()
-
   return (
     <>
       {mobileOpen ? (
@@ -61,31 +55,29 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
           </NavLink>
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
-          {items
-            .filter((it) => routeAllowedForRole(role, it.to))
-            .map((it) => (
-              <NavLink
-                key={it.to}
-                to={it.to}
-                end={it.end}
-                onClick={onCloseMobile}
-                className={({ isActive }) =>
-                  [
-                    'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
-                    isActive
-                      ? 'bg-elevated font-medium text-slate-100 shadow-card'
-                      : 'text-muted hover:bg-elevated/60 hover:text-slate-200',
-                  ].join(' ')
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <it.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-accent' : 'opacity-80'}`} />
-                    <span>{it.label}</span>
-                  </>
-                )}
-              </NavLink>
-            ))}
+          {items.map((it) => (
+            <NavLink
+              key={it.to}
+              to={it.to}
+              end={it.end}
+              onClick={onCloseMobile}
+              className={({ isActive }) =>
+                [
+                  'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
+                  isActive
+                    ? 'bg-elevated font-medium text-slate-100 shadow-card'
+                    : 'text-muted hover:bg-elevated/60 hover:text-slate-200',
+                ].join(' ')
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <it.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-accent' : 'opacity-80'}`} />
+                  <span>{it.label}</span>
+                </>
+              )}
+            </NavLink>
+          ))}
         </nav>
         <div className="border-t border-line p-4">
           <div className="rounded-xl border border-line bg-elevated/80 p-3 shadow-card">
@@ -125,40 +117,10 @@ function IconGrid({ className }: { className?: string }) {
   )
 }
 
-function IconUsers({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.433-2.554M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-    </svg>
-  )
-}
-
-function IconEye({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
-      />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  )
-}
-
 function IconList({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-    </svg>
-  )
-}
-
-function IconCoin({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <circle cx="12" cy="12" r="9" />
-      <path strokeLinecap="round" d="M8 10h8M8 14h8M12 8v8" />
     </svg>
   )
 }

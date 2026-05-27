@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Button, Field, TextInput, TextArea, Select, Accordion } from '../components/ui'
+import { Card, Button, Field, TextInput, TextArea, Select } from '../components/ui'
 import type { ClienteFormDto } from '../types/dto'
 import { emptyFormDto, formularioNuevoToPayload } from '../lib/mappers'
 import { registrarClienteDesdeApi } from '../services/clientesApi'
@@ -32,14 +32,14 @@ export default function NuevoClientePage() {
   const [errors, setErrors] = useState<Partial<Record<keyof ClienteFormDto, string>>>({})
   const [serverError, setServerError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [exito, setExito] = useState<{ txId?: string } | null>(null)
+  const [exito, setExito] = useState(false)
   const navigate = useNavigate()
   const log = useSessionLog()
   const { readOnly } = useAuth()
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setExito(null)
+    setExito(false)
     setServerError(null)
     const v = validar(form)
     setErrors(v)
@@ -50,7 +50,7 @@ export default function NuevoClientePage() {
       const payload = formularioNuevoToPayload(form)
       const res = await registrarClienteDesdeApi(payload)
       logRegistroClienteExitoso(log, form.codigoCliente.trim(), res.txId)
-      setExito({ txId: res.txId })
+      setExito(true)
       setForm(emptyFormDto())
     } catch (err) {
       logTechnicalApiFailure('clientes.registrar', err)
@@ -81,18 +81,14 @@ export default function NuevoClientePage() {
         {exito ? (
           <div className="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
             <p className="font-medium">Cliente registrado correctamente.</p>
-            {exito.txId ? (
-              <div className="mt-3">
-                <Accordion title="Referencia de registro">
-                  <span className="break-all font-mono text-[11px] text-[#6B7280]">{exito.txId}</span>
-                </Accordion>
-              </div>
-            ) : null}
+            <p className="mt-1 text-sm opacity-90">
+              El registro quedó guardado. Puede ver el detalle en el listado de clientes.
+            </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button type="button" onClick={() => navigate('/clientes')}>
                 Ver listado
               </Button>
-              <Button variant="secondary" type="button" onClick={() => setExito(null)}>
+              <Button variant="secondary" type="button" onClick={() => setExito(false)}>
                 Registrar otro
               </Button>
             </div>

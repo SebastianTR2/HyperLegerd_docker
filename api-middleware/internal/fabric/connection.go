@@ -7,7 +7,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"time"
+
+	"api-middleware/internal/tenants"
 
 	"github.com/hyperledger/fabric-gateway/pkg/client"
 	"github.com/hyperledger/fabric-gateway/pkg/identity"
@@ -16,36 +20,126 @@ import (
 )
 
 // GlobalGateway es la instancia persistente del cliente de Fabric.
+//
+// Compatibilidad legacy: cuando se opera en modo single-tenant, apunta al
+// gateway del tenant por defecto ("clientes").
 var GlobalGateway *client.Gateway
 
-// Connect establece la conexión con la red Fabric.
+var (
+	gatewaysMu sync.RWMutex
+	gateways   = map[string]*client.Gateway{} // tenantId → gateway
+
+	tenantsMu sync.RWMutex
+	registry  *tenants.Registry
+)
+
+// Connect mantiene el comportamiento legacy: si hay TENANTS_FILE válido se
+// conectan todos los tenants definidos; en caso contrario se construye un
+// registro single-tenant a partir del .env.
+//
+// Esta función no rompe el flujo existente: tras llamarla, GlobalGateway sigue
+// apuntando al tenant por defecto y los handlers legacy siguen funcionando.
 func Connect() error {
-	mspID := os.Getenv("MSPID")
-	certPath := os.Getenv("CERT_PATH")
-	keyPathDir := os.Getenv("KEY_PATH_DIR")
-	tlsCertPath := os.Getenv("TLS_CERT_PATH")
-	peerEndpoint := os.Getenv("PEER_ENDPOINT")
-	peerHostAlias := os.Getenv("PEER_HOST_ALIAS")
-
-	// 1. Cargar Certificado de Identidad
-	id, err := loadIdentity(mspID, certPath)
+	reg, _, err := tenants.Load()
 	if err != nil {
-		return fmt.Errorf("error al cargar identidad: %w", err)
+		return fmt.Errorf("cargar configuración de tenants: %w", err)
+	}
+	return ConnectAll(reg)
+}
+
+// ConnectAll abre un Gateway por cada tenant del registro y guarda referencias.
+// Si algún tenant falla se registra el error pero se continúa con los demás
+// (el middleware puede arrancar parcialmente y reportar fallos).
+func ConnectAll(reg *tenants.Registry) error {
+	if reg == nil || len(reg.Tenants) == 0 {
+		return errors.New("no hay tenants para conectar")
 	}
 
-	// 2. Cargar Llave Privada (Firmante Manual)
-	signer, err := loadSigner(keyPathDir)
-	if err != nil {
-		return fmt.Errorf("error al cargar firmante: %w", err)
+	tenantsMu.Lock()
+	registry = reg
+	tenantsMu.Unlock()
+
+	var firstErr error
+	var errsTenants []string
+	for id, t := range reg.Tenants {
+		gw, err := connectTenant(t)
+		if err != nil {
+			errsTenants = append(errsTenants, fmt.Sprintf("%s: %v", id, err))
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		gatewaysMu.Lock()
+		gateways[id] = gw
+		gatewaysMu.Unlock()
 	}
 
-	// 3. Crear conexión gRPC con TLS
-	grpcConn, err := createGrpcConnection(tlsCertPath, peerEndpoint, peerHostAlias)
-	if err != nil {
-		return fmt.Errorf("error de conexión gRPC: %w", err)
+	// GlobalGateway apunta al tenant por defecto (para compat con handlers viejos).
+	if gw, ok := gatewayFor(reg.Default); ok {
+		GlobalGateway = gw
 	}
 
-	// 4. Conectar al Gateway
+	if len(errsTenants) > 0 {
+		return fmt.Errorf("fallaron tenants: %s", strings.Join(errsTenants, "; "))
+	}
+	return firstErr
+}
+
+// Registry devuelve el registro multi-tenant cargado (puede ser nil si Connect aún no se ejecutó).
+func Registry() *tenants.Registry {
+	tenantsMu.RLock()
+	defer tenantsMu.RUnlock()
+	return registry
+}
+
+// GatewayFor devuelve el gateway del tenant indicado. Si el tenant no existe o
+// no se conectó, devuelve (nil, false).
+func GatewayFor(tenantID string) (*client.Gateway, bool) {
+	return gatewayFor(tenantID)
+}
+
+// TenantFor devuelve el objeto Tenant para un id dado.
+func TenantFor(tenantID string) (*tenants.Tenant, bool) {
+	tenantsMu.RLock()
+	defer tenantsMu.RUnlock()
+	if registry == nil {
+		return nil, false
+	}
+	t := registry.Get(tenantID)
+	if t == nil {
+		return nil, false
+	}
+	return t, true
+}
+
+func gatewayFor(tenantID string) (*client.Gateway, bool) {
+	gatewaysMu.RLock()
+	defer gatewaysMu.RUnlock()
+	gw, ok := gateways[strings.TrimSpace(tenantID)]
+	return gw, ok
+}
+
+func connectTenant(t *tenants.Tenant) (*client.Gateway, error) {
+	if t == nil {
+		return nil, errors.New("tenant nil")
+	}
+	if strings.TrimSpace(t.MSPID) == "" {
+		return nil, fmt.Errorf("tenant %s sin MSPID", t.ID)
+	}
+
+	id, err := loadIdentity(t.MSPID, t.CertPath)
+	if err != nil {
+		return nil, fmt.Errorf("identidad: %w", err)
+	}
+	signer, err := loadSigner(t.KeyPathDir)
+	if err != nil {
+		return nil, fmt.Errorf("firmante: %w", err)
+	}
+	grpcConn, err := createGrpcConnection(t.TLSCertPath, t.PeerEndpoint, t.PeerHostAlias)
+	if err != nil {
+		return nil, fmt.Errorf("gRPC: %w", err)
+	}
 	gw, err := client.Connect(
 		id,
 		client.WithSign(signer),
@@ -56,14 +150,15 @@ func Connect() error {
 		client.WithCommitStatusTimeout(1*time.Minute),
 	)
 	if err != nil {
-		return fmt.Errorf("error al conectar con el Gateway: %w", err)
+		return nil, fmt.Errorf("gateway: %w", err)
 	}
-
-	GlobalGateway = gw
-	return nil
+	return gw, nil
 }
 
 func loadIdentity(mspID string, certPath string) (identity.Identity, error) {
+	if strings.TrimSpace(certPath) == "" {
+		return nil, errors.New("CERT_PATH vacío")
+	}
 	certBytes, err := os.ReadFile(certPath)
 	if err != nil {
 		return nil, err
@@ -83,6 +178,9 @@ func loadIdentity(mspID string, certPath string) (identity.Identity, error) {
 }
 
 func loadSigner(keyPathDir string) (func(digest []byte) ([]byte, error), error) {
+	if strings.TrimSpace(keyPathDir) == "" {
+		return nil, errors.New("KEY_PATH_DIR vacío")
+	}
 	files, err := os.ReadDir(keyPathDir)
 	if err != nil {
 		return nil, err
@@ -126,6 +224,9 @@ func loadSigner(keyPathDir string) (func(digest []byte) ([]byte, error), error) 
 }
 
 func createGrpcConnection(tlsCertPath string, peerEndpoint string, peerHostAlias string) (*grpc.ClientConn, error) {
+	if strings.TrimSpace(tlsCertPath) == "" {
+		return nil, errors.New("TLS_CERT_PATH vacío")
+	}
 	cert, err := os.ReadFile(tlsCertPath)
 	if err != nil {
 		return nil, err

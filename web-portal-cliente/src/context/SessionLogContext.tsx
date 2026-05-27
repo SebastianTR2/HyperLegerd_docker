@@ -89,13 +89,12 @@ export function useSessionLog(): SessionLogValue {
 }
 
 /** Registra alta exitosa en sesión (mensaje + actividad en lenguaje neutro, sin rol técnico). */
-export function logRegistroClienteExitoso(log: SessionLogValue, clienteId: string, txId?: string): void {
+export function logRegistroClienteExitoso(log: SessionLogValue, clienteId: string, _txId?: string): void {
   const id = clienteId.trim()
   log.pushMessage({
     variant: 'success',
     titulo: 'Cliente registrado correctamente.',
     detalle: id ? `Se registró el cliente ${id}.` : undefined,
-    referenciaTecnica: txId?.trim() || undefined,
   })
   log.pushActivity({
     variant: 'ok',

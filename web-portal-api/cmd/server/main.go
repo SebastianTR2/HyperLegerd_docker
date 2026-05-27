@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net/http"
 
@@ -10,6 +11,7 @@ import (
 	"web-portal-api/internal/db"
 	"web-portal-api/internal/handlers"
 	"web-portal-api/internal/middleware"
+	"web-portal-api/internal/usuariosadmin"
 )
 
 func main() {
@@ -47,6 +49,33 @@ func main() {
 	r.GET("/clientes/*proxyPath", authMW, proxyH.ProxyClientes)
 	r.PATCH("/clientes/*proxyPath", authMW, middleware.RequireWriteRole(), proxyH.ProxyClientes)
 	r.POST("/clientes/*proxyPath", authMW, middleware.RequireWriteRole(), proxyH.ProxyClientes)
+
+	// ── Consola del puente (web-cliente-demo) ─────────────────────────────
+	// Tokens distintos a los del portal-cliente: scope=admin-console,
+	// claims llevan tenant. El proxy genérico /admin/api/* reenvía todo el
+	// catálogo de endpoints del api-middleware sin que el frontend vea la
+	// X-API-Key.
+	registroAdmin := usuariosadmin.Nuevo()
+	if err := registroAdmin.LoadFromFile(cfg.UsuariosAdminFile); err != nil {
+		if errors.Is(err, usuariosadmin.ErrConfiguracionAusente) {
+			log.Printf("usuariosadmin: %s no encontrado, /admin/* devolverá 503", cfg.UsuariosAdminFile)
+		} else {
+			log.Fatalf("usuariosadmin: %v", err)
+		}
+	} else {
+		_, ruta, _, total := registroAdmin.Estado()
+		log.Printf("usuariosadmin cargado: %d cuentas desde %s", total, ruta)
+	}
+	revocAdmin := handlers.NuevaRevocacionesMemoria()
+	adminAuthH := &handlers.AdminAuthHandler{Cfg: cfg, Registro: registroAdmin, JTIRevocados: revocAdmin}
+	adminProxyH := &handlers.AdminProxyHandler{Cfg: cfg, Registro: registroAdmin}
+	adminAuthMW := middleware.RequireAdminAuth(cfg, revocAdmin)
+
+	r.POST("/admin/auth/login", adminAuthH.Login)
+	r.GET("/admin/auth/me", adminAuthMW, adminAuthH.Me)
+	r.POST("/admin/auth/logout", adminAuthMW, adminAuthH.Logout)
+	// Proxy genérico: cualquier método y subruta entra por aquí.
+	r.Any("/admin/api/*proxyPath", adminAuthMW, adminProxyH.Proxy)
 
 	log.Printf("web-portal-api escuchando en :%s (middleware=%s)", cfg.Port, cfg.MiddlewareURL)
 	if err := r.Run(":" + cfg.Port); err != nil {

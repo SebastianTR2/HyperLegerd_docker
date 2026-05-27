@@ -1,5 +1,5 @@
 /** Marca de baja en notas (api-middleware). */
-const MARCA_BAJA_LOGICA_API = '[baja-logica-api]'
+export const MARCA_BAJA_LOGICA_API = '[baja-logica-api]'
 
 export interface NotasLedgerParseadas {
   /** Texto editable / visible como nota de negocio. */
@@ -8,38 +8,46 @@ export interface NotasLedgerParseadas {
   informacionAuditoria: string | null
 }
 
-const FIRMA_PREFIX_RE = /^FIRMA:\s*(SIG-[a-f0-9]+)\s*\|\s*/i
+const FIRMA_CHUNK_RE = /FIRMA:\s*(SIG-[a-f0-9]+)\s*\|\s*/gi
+const ACTOR_CHUNK_RE =
+  /\[actor\]\s*[\s\S]*?(?=\s*FIRMA:|\s*\[actor\]|$)/gi
+const LEGACY_OPERADOR_RE = /\[(?!baja-logica-api)[^\]]+\]/gi
 
 /**
  * Separa nota de negocio de metadatos del ledger (FIRMA, actor, baja lógica).
- * `notasRaw` completo se conserva para detectar baja lógica vía {@link MARCA_BAJA_LOGICA_API}.
+ * Soporta varias capas acumuladas en un solo campo (altas y ediciones sucesivas).
  */
 export function parseNotasLedger(notasRaw: string): NotasLedgerParseadas {
-  let rest = notasRaw.trim()
   const auditParts: string[] = []
+  let rest = notasRaw.trim()
 
-  const firmaMatch = rest.match(FIRMA_PREFIX_RE)
-  if (firmaMatch) {
-    auditParts.push(`Firma de integridad: ${firmaMatch[1]}`)
-    rest = rest.slice(firmaMatch[0].length).trim()
+  const firmas = [...rest.matchAll(FIRMA_CHUNK_RE)]
+  for (const m of firmas) {
+    if (m[1]) auditParts.push(`Firma de integridad: ${m[1]}`)
   }
+  rest = rest.replace(FIRMA_CHUNK_RE, ' ').trim()
+
+  const actores = [...rest.matchAll(ACTOR_CHUNK_RE)]
+  for (const m of actores) {
+    const { actorLabel, business } = parseActorBody(m[0])
+    if (actorLabel) auditParts.push(`Operador: ${actorLabel}`)
+    if (business) rest = `${rest} ${business}`.trim()
+  }
+  rest = rest.replace(ACTOR_CHUNK_RE, ' ').trim()
+
+  const legacy = [...rest.matchAll(LEGACY_OPERADOR_RE)]
+  for (const m of legacy) {
+    const t = m[0].trim()
+    if (t.toLowerCase().startsWith('[actor]')) continue
+    auditParts.push(t)
+  }
+  rest = rest.replace(LEGACY_OPERADOR_RE, ' ').trim()
 
   const businessLines: string[] = []
-
   for (const line of rest.split(/\r?\n/)) {
     const t = line.trim()
     if (!t) continue
     if (t.includes(MARCA_BAJA_LOGICA_API) || /baja\s+l[oó]gica\s+registrada/i.test(t)) {
-      auditParts.push(t)
-      continue
-    }
-    if (t.toLowerCase().startsWith('[actor]')) {
-      const { actorLabel, business } = parseActorLine(t)
-      if (actorLabel) auditParts.push(`Operador: ${actorLabel}`)
-      if (business) businessLines.push(business)
-      continue
-    }
-    if (t.startsWith('[') && !t.toLowerCase().startsWith('[actor]')) {
       auditParts.push(t)
       continue
     }
@@ -53,9 +61,8 @@ export function parseNotasLedger(notasRaw: string): NotasLedgerParseadas {
   return { notasNegocio, informacionAuditoria }
 }
 
-/** `[actor] Nombre · rol · usuario nota` → metadatos + nota de negocio. */
-function parseActorLine(line: string): { actorLabel: string; business: string } {
-  const body = line.replace(/^\[actor\]\s*/i, '').trim()
+function parseActorBody(chunk: string): { actorLabel: string; business: string } {
+  const body = chunk.replace(/^\[actor\]\s*/i, '').trim()
   const parts = body.split(' · ')
   if (parts.length < 3) {
     return { actorLabel: body, business: '' }

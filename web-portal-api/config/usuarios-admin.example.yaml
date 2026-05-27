@@ -1,0 +1,68 @@
+# Configuración de usuarios de la CONSOLA del puente (web-cliente-demo).
+# Estas cuentas NO son las del portal del cliente final; son operadores
+# humanos a los que el dueño del BaaS les da acceso a explorar/auditar
+# o a registrar datos en nombre del tenant.
+#
+# El archivo es leído al arrancar el BFF (web-portal-api). Para añadir,
+# editar o desactivar un usuario:
+#   1. Generar el hash bcrypt:
+#        cd web-portal-api
+#        go run ./cmd/bcrypt-gen "mi-contrasena"
+#   2. Pegar el hash en contrasena_hash.
+#   3. Reiniciar el BFF.
+#
+# El frontend NUNCA ve la X-API-Key real: el BFF la inyecta al reenviar
+# la petición al api-middleware en función de (tenant, rol).
+
+# Tenant que se asigna a usuarios que no especifiquen el campo `tenant`.
+default_tenant: clientes
+
+# Cada tenant declara las X-API-Key reales del api-middleware. Estos
+# valores DEBEN coincidir con los del campo `claves_api` del archivo
+# tenants.yaml del api-middleware. Puedes sobreescribirlos por env si
+# prefieres no commitearlos (no implementado todavía aquí).
+tenants:
+  clientes:
+    nombre: "Demostraciones / clientes"
+    api_keys:
+      admin: sec-admin
+      integrador: sec-int
+      lectura: sec-lect
+  agricultura:
+    nombre: "Agricultura (canal aparte)"
+    api_keys:
+      admin: agri-admin-2026
+      integrador: agri-int-2026
+      lectura: agri-lect-2026
+
+# Lista de cuentas humanas.
+usuarios:
+  # ---- Demo Clientes ----
+  - usuario: ana
+    nombre_completo: "Ana Pérez"
+    rol: integrador            # admin | integrador | lectura
+    tenant: clientes
+    # bcrypt de la contraseña "ana-clientes-2026"
+    contrasena_hash: "REEMPLAZAR_CON_BCRYPT"
+
+  - usuario: carlos
+    nombre_completo: "Carlos Mamani"
+    rol: admin
+    tenant: clientes
+    # bcrypt de "carlos-admin-2026"
+    contrasena_hash: "REEMPLAZAR_CON_BCRYPT"
+
+  - usuario: lucia
+    nombre_completo: "Lucía Auditora"
+    rol: lectura
+    tenant: clientes
+    # bcrypt de "lucia-lectura-2026"
+    contrasena_hash: "REEMPLAZAR_CON_BCRYPT"
+
+  # ---- Demo Agricultura ----
+  - usuario: olga
+    nombre_completo: "Olga Roque"
+    rol: admin
+    tenant: agricultura
+    # bcrypt de "olga-agri-2026"
+    contrasena_hash: "REEMPLAZAR_CON_BCRYPT"

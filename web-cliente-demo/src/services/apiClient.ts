@@ -1,8 +1,13 @@
-import { getApiKeyStored } from '../lib/settings'
+import { leerTokenSesion } from '../context/AuthContext'
 import type { RespuestaError } from '../types/api'
 
-/** Prefijo relativo: en dev Vite proxy reenvía `/api` → backend sin CORS. */
-export const API_PREFIX = '/api'
+/**
+ * Prefijo relativo: en dev Vite proxy reenvía `/api/*` al BFF
+ * (web-portal-api). El BFF valida JWT, inyecta X-API-Key + X-Actor-*
+ * y reenvía al api-middleware. El frontend nunca habla directamente
+ * con el middleware.
+ */
+export const API_PREFIX = '/api/admin/api'
 
 export class ApiHttpError extends Error {
   readonly status: number
@@ -25,13 +30,17 @@ function parseJsonSafe(text: string): unknown {
 }
 
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const url = path.startsWith('http') ? path : `${API_PREFIX}${path.startsWith('/') ? path : `/${path}`}`
+  const url = path.startsWith('http')
+    ? path
+    : `${API_PREFIX}${path.startsWith('/') ? path : `/${path}`}`
   const headers = new Headers(init.headers ?? undefined)
-  const key = getApiKeyStored()
-  if (key) {
-    headers.set('X-API-Key', key)
+  const jwt = leerTokenSesion()
+  if (jwt) {
+    headers.set('Authorization', `Bearer ${jwt}`)
   }
-  headers.set('Accept', 'application/json')
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json')
+  }
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }

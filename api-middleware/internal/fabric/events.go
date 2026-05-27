@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 // EventoNormalizado es la estructura estandarizada que se entregará a la API (Paso 3)
 type EventoNormalizado struct {
 	Timestamp    time.Time       `json:"timestamp"`
+	Tenant       string          `json:"tenant,omitempty"`
+	Canal        string          `json:"canal,omitempty"`
 	Contrato     string          `json:"contrato"`
 	NombreEvento string          `json:"nombreEvento"`
 	TxID         string          `json:"txId"`
@@ -94,9 +97,15 @@ func (b *EventBroker) GetHistorial() []EventoNormalizado {
 	return copia
 }
 
-// StartEventListening inicia la escucha (Paso 2) y aplica el filtrado de eventos relevantes (Paso 1).
-// También maneja la resiliencia (Paso 5) con reconexión exponencial y protección contra pánicos.
+// StartEventListening inicia la escucha en el tenant por defecto (compat legacy).
 func StartEventListening(ctx context.Context, chaincodeName string) {
+	StartEventListeningTenant(ctx, "", "", chaincodeName)
+}
+
+// StartEventListeningTenant inicia la escucha de eventos del chaincode indicado
+// para el tenant dado. Si tenantID o channelName están vacíos, se usa el tenant
+// por defecto y el CHANNEL_NAME del .env (compat).
+func StartEventListeningTenant(ctx context.Context, tenantID, channelName, chaincodeName string) {
 	// Protección contra pánicos inesperados para no tumbar el API
 	defer func() {
 		if r := recover(); r != nil {
@@ -115,7 +124,7 @@ func StartEventListening(ctx context.Context, chaincodeName string) {
 
 	// Fase 5: Manejo de reconexión o pérdida temporal de eventos (loop infinito)
 	for {
-		err := listenLoop(ctx, chaincodeName)
+		err := listenLoop(ctx, tenantID, channelName, chaincodeName)
 		
 		// Si se canceló el contexto desde arriba, nos detenemos limpiamente.
 		if ctx.Err() != nil {
@@ -148,15 +157,25 @@ func StartEventListening(ctx context.Context, chaincodeName string) {
 	}
 }
 
-// listenLoop maneja una sesión individual de conexión.
-func listenLoop(ctx context.Context, chaincodeName string) error {
-	if GlobalGateway == nil {
+// listenLoop maneja una sesión individual de conexión para un tenant/canal/chaincode.
+func listenLoop(ctx context.Context, tenantID, channelName, chaincodeName string) error {
+	gw := defaultTenantGateway()
+	canal := canalEfectivo(channelName)
+	if id := strings.TrimSpace(tenantID); id != "" {
+		if g, ok := GatewayFor(id); ok {
+			gw = g
+		}
+		if t, ok := TenantFor(id); ok && strings.TrimSpace(channelName) == "" {
+			canal = t.Canal
+		}
+	}
+	if gw == nil {
 		return fmt.Errorf("el gateway no está inicializado")
 	}
 
-	network := GlobalGateway.GetNetwork(canalEfectivo(""))
+	network := gw.GetNetwork(canal)
 
-	log.Printf("[EVENTOS] Iniciando suscripción a eventos de chaincode: %s", chaincodeName)
+	log.Printf("[EVENTOS] Suscripción tenant=%s canal=%s chaincode=%s", tenantID, canal, chaincodeName)
 	eventIter, err := network.ChaincodeEvents(ctx, chaincodeName)
 	if err != nil {
 		return fmt.Errorf("fallo al suscribirse a eventos del chaincode %s: %w", chaincodeName, err)
@@ -186,6 +205,8 @@ func listenLoop(ctx context.Context, chaincodeName string) error {
 
 		evNorm := EventoNormalizado{
 			Timestamp:    time.Now().UTC(),
+			Tenant:       tenantID,
+			Canal:        canal,
 			Contrato:     chaincodeName,
 			NombreEvento: eventoBlockchain.EventName,
 			TxID:         eventoBlockchain.TransactionID,

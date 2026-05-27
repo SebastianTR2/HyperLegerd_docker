@@ -1,23 +1,24 @@
 import type { AppRole } from '../types/demo'
 
+/**
+ * Permisos efectivos del rol en la CONSOLA del puente (audit-only).
+ *
+ * Importante: el `web-cliente-demo` es explorer; las altas y ediciones de
+ * clientes se realizan en el portal del cliente (`web-portal-cliente`) o
+ * directamente vía API. Los permisos de escritura del rol siguen
+ * vigentes en el `api-middleware`, pero ya no se exponen botones de
+ * escritura en esta UI.
+ */
 export interface RolePermissions {
-  canRegisterClients: boolean
-  canEditDemoRecords: boolean
-  canDeleteDemoRecords: boolean
   canConsultClients: boolean
-  canEmitTokens: boolean
-  canTransferTokens: boolean
   canViewHistory: boolean
   canViewTraceability: boolean
-  /** Alta de cuenta token visible (Fase 2); admin e integrador. */
-  canCreateVisibleTokenAccount: boolean
+  /** Solo admin recibe notificaciones del feed administrativo. */
+  canSeeAdminNotifications: boolean
 }
 
 export type AppRoutePath =
   | '/'
-  | '/registros'
-  | '/tokens'
-  | '/cuentas-visibles'
   | '/clientes-registrados'
   | '/consultas'
   | '/auditoria'
@@ -26,16 +27,19 @@ export type AppRoutePath =
   | '/trazabilidad'
   | '/credenciales'
 
-const ADMIN_KEY = 'sec-admin'
-const INTEGRADOR_KEY = 'sec-int'
-const LECTURA_KEY = 'sec-lect'
-
-export function resolveRoleFromApiKey(apiKey: string): AppRole {
-  const k = apiKey.trim()
-  if (k === ADMIN_KEY) return 'admin'
-  if (k === INTEGRADOR_KEY) return 'integrador'
-  if (k === LECTURA_KEY || !k) return 'solo_lectura'
-  return 'solo_lectura'
+/** Convierte el rol del backend (admin|integrador|lectura) al alias usado en la UI. */
+export function roleFromBackend(rol: string | undefined | null): AppRole {
+  switch ((rol ?? '').toLowerCase().trim()) {
+    case 'admin':
+      return 'admin'
+    case 'integrador':
+      return 'integrador'
+    case 'lectura':
+    case 'solo_lectura':
+      return 'solo_lectura'
+    default:
+      return 'solo_lectura'
+  }
 }
 
 export function roleLabel(role: AppRole): string {
@@ -45,52 +49,21 @@ export function roleLabel(role: AppRole): string {
 }
 
 export function workspaceLabel(role: AppRole): string {
-  if (role === 'admin') return 'Panel administrativo'
-  if (role === 'integrador') return 'Panel de integracion'
-  return 'Panel de consulta'
+  if (role === 'admin') return 'Panel del puente'
+  if (role === 'integrador') return 'Explorador del puente'
+  return 'Consulta del puente'
 }
 
+/**
+ * Todos los roles con sesión tienen acceso a las páginas de lectura del
+ * puente. La diferencia es que solo `admin` recibe notificaciones en
+ * vivo del feed administrativo.
+ */
 export function rolePermissions(role: AppRole): RolePermissions {
-  if (role === 'admin') {
-    return {
-      canRegisterClients: true,
-      canEditDemoRecords: true,
-      canDeleteDemoRecords: true,
-      canConsultClients: true,
-      canEmitTokens: true,
-      canTransferTokens: true,
-      canViewHistory: true,
-      canViewTraceability: true,
-      canCreateVisibleTokenAccount: true,
-    }
-  }
-  if (role === 'integrador') {
-    return {
-      canRegisterClients: true,
-      canEditDemoRecords: false,
-      canDeleteDemoRecords: false,
-      canConsultClients: true,
-      canEmitTokens: false,
-      canTransferTokens: false,
-      canViewHistory: true,
-      canViewTraceability: true,
-      canCreateVisibleTokenAccount: true,
-    }
-  }
   return {
-    canRegisterClients: false,
-    canEditDemoRecords: false,
-    canDeleteDemoRecords: false,
     canConsultClients: true,
-    canEmitTokens: false,
-    canTransferTokens: false,
     canViewHistory: true,
     canViewTraceability: true,
-    canCreateVisibleTokenAccount: false,
+    canSeeAdminNotifications: role === 'admin',
   }
-}
-
-export function routeAllowedForRole(role: AppRole, path: AppRoutePath): boolean {
-  if (path === '/tokens' && role !== 'admin') return false
-  return true
 }

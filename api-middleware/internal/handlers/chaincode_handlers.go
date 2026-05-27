@@ -94,9 +94,14 @@ func invocarChaincodeConPoliticas(c *gin.Context, audiencia string, reglas []cha
 		return
 	}
 
+	// Multi-tenant: el tenant resuelto desde X-API-Key elige el Gateway.
+	// El canal solicitado en el body se respeta si pertenece a ese tenant;
+	// si está vacío se usa el canal por defecto del tenant.
+	tenantID := middleware.TenantFromContext(c)
+
 	switch modo {
 	case "evaluate":
-		payload, err := fabric.EvaluateTransactionEnCanal(req.Canal, req.Contrato, req.Funcion, req.Parametros...)
+		payload, err := fabric.EvaluateTransactionTenant(tenantID, req.Canal, req.Contrato, req.Funcion, req.Parametros...)
 		if err != nil {
 			st, cod, pub := clasificarErrorFabric(err)
 			registrarBitacoraChaincode(c, audiencia, req, "error", st, cod, "", err.Error())
@@ -106,7 +111,7 @@ func invocarChaincodeConPoliticas(c *gin.Context, audiencia string, reglas []cha
 		registrarBitacoraChaincode(c, audiencia, req, "exito", http.StatusOK, "CONSULTA_EXITOSA", "", "")
 		c.JSON(http.StatusOK, respuestaLecturaFabric(c, payload, "Invocación evaluate completada"))
 	default: // submit
-		res, err := fabric.InvokeTransactionWithTxIDEnCanal(req.Canal, req.Contrato, req.Funcion, req.Parametros...)
+		res, err := fabric.InvokeTransactionWithTxIDTenant(tenantID, req.Canal, req.Contrato, req.Funcion, req.Parametros...)
 		if err != nil {
 			st, cod, pub := clasificarErrorFabric(err)
 			registrarBitacoraChaincode(c, audiencia, req, "error", st, cod, "", err.Error())
@@ -155,7 +160,8 @@ func clasificarErrorFabric(err error) (status int, codigo string, mensajePublico
 	}
 	msg := err.Error()
 	l := strings.ToLower(msg)
-	if strings.Contains(l, "el gateway no está inicializado") {
+	if strings.Contains(l, "el gateway no está inicializado") ||
+		strings.Contains(l, "no tiene gateway conectado") {
 		return http.StatusServiceUnavailable, "SERVICIO_NO_DISPONIBLE", "El acceso al ledger no está disponible en este momento."
 	}
 	if esErrorLedgerNoEncontrado(err) {

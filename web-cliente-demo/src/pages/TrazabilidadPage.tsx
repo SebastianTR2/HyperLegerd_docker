@@ -5,19 +5,21 @@ import { formatDemoDateTime } from '../lib/format'
 import { etiquetaTokenDemo } from '../lib/tokenDemoLabel'
 import type { TraceEntry, TraceOperationType } from '../types/demo'
 
-const filtros: { id: TraceOperationType | 'all'; label: string }[] = [
+// Filtros para trazabilidad. La consola es audit-only y no maneja tokens.
+const filtrosBase: { id: TraceOperationType | 'all'; label: string }[] = [
   { id: 'all', label: 'Todas' },
   { id: 'CLIENTE_REGISTRADO', label: 'Cliente registrado' },
   { id: 'CLIENTE_CONSULTADO', label: 'Cliente consultado' },
-  { id: 'CUENTA_VISIBLE_CREADA', label: 'Cuenta token visible' },
-  { id: 'TOKEN_EMITIDO', label: 'Token emitido' },
-  { id: 'TOKEN_TRANSFERIDO', label: 'Token transferido' },
   { id: 'ERROR_PERMISOS', label: 'Errores de permisos' },
   { id: 'ERROR_API', label: 'Errores API' },
 ]
 
+function filtrosTrazabilidad(): typeof filtrosBase {
+  return filtrosBase
+}
+
 function traceTipoLabel(t: TraceOperationType): string {
-  const hit = filtros.find((f) => f.id === t)
+  const hit = filtrosBase.find((f) => f.id === t)
   return hit?.label ?? t
 }
 
@@ -56,7 +58,7 @@ export default function TrazabilidadPage() {
           aplica). Puedes copiar txId/txIdMint para validarlo manualmente en Hyperledger Explorer.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          {filtros.map((f) => (
+          {filtrosTrazabilidad().map((f) => (
             <button
               key={f.id}
               type="button"

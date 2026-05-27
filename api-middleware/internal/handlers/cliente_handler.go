@@ -3,12 +3,14 @@ package handlers
 import (
 	"api-middleware/internal/fabric"
 	"api-middleware/internal/middleware"
+	"api-middleware/internal/notificador"
 	"api-middleware/pkg/models"
 	"encoding/json"
 	"fmt"
 	"net/mail"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -72,9 +74,42 @@ func prefijoAuditoriaOperador(c *gin.Context) string {
 	return "[" + getRoleFromKey(c.GetHeader("X-API-Key")) + "]"
 }
 
+var (
+	reFirmaEnNotas    = regexp.MustCompile(`(?i)FIRMA:\s*SIG-[a-f0-9]+\s*\|\s*`)
+	reActorEnNotas    = regexp.MustCompile(`(?i)\[actor\][^[\n]*`)
+	reEtiquetaCorch   = regexp.MustCompile(`\[[^\]]+\]`)
+	reRevisionLegacy  = regexp.MustCompile(`_REV_\d+$`)
+)
+
+// sanitizarNotasNegocio quita FIRMA, [actor] y prefijos viejos; solo conserva texto de negocio del usuario.
+//
+// Notas de implementación:
+//   - Go RE2 no soporta lookahead/lookbehind, por eso el filtrado del marcador
+//     [baja-logica-api] se hace con ReplaceAllStringFunc y no con una negative
+//     lookahead.
+func sanitizarNotasNegocio(notas string) string {
+	s := strings.TrimSpace(notas)
+	for i := 0; i < 32; i++ {
+		prev := s
+		s = strings.TrimSpace(reFirmaEnNotas.ReplaceAllString(s, " "))
+		s = strings.TrimSpace(reActorEnNotas.ReplaceAllString(s, " "))
+		s = strings.TrimSpace(reEtiquetaCorch.ReplaceAllStringFunc(s, func(m string) string {
+			low := strings.ToLower(m)
+			if strings.Contains(low, "baja-logica-api") {
+				return m
+			}
+			return " "
+		}))
+		if s == prev {
+			break
+		}
+	}
+	return s
+}
+
 func inyectarAuditoriaNotas(c *gin.Context, notas string) string {
 	pref := prefijoAuditoriaOperador(c)
-	notas = strings.TrimSpace(notas)
+	notas = sanitizarNotasNegocio(notas)
 	if notas == "" {
 		return pref
 	}
@@ -148,7 +183,13 @@ func RegistrarCliente(c *gin.Context) {
 		return
 	}
 
-	// 2. Responder con el éxito
+	publicarNotificacion(c,
+		notificador.EventoClienteCreado,
+		n.ClienteId,
+		result.TxID,
+		fmt.Sprintf("Cliente %s registrado", n.ClienteId),
+	)
+
 	c.JSON(http.StatusCreated, models.RespuestaExitoTx{
 		Ok:      true,
 		TxId:    result.TxID,
@@ -188,7 +229,17 @@ func ListarClientes(c *gin.Context) {
 	if clientes == nil {
 		clientes = []models.Cliente{}
 	}
-	c.JSON(http.StatusOK, respuestaLecturaTipada(c, "CONSULTA_EXITOSA", "Listado de clientes registrados", clientes, raw))
+	// Filtrar restos del legado de "borradores": claves _DRAFT y _REV_N
+	// quedan visibles en GetAllAssets hasta que se actualice el chaincode.
+	filtrados := clientes[:0]
+	for _, cli := range clientes {
+		id := strings.ToUpper(strings.TrimSpace(cli.ClienteId))
+		if strings.HasSuffix(id, "_DRAFT") || reRevisionLegacy.MatchString(id) {
+			continue
+		}
+		filtrados = append(filtrados, cli)
+	}
+	c.JSON(http.StatusOK, respuestaLecturaTipada(c, "CONSULTA_EXITOSA", "Listado de clientes registrados", filtrados, raw))
 }
 
 // ConsultarCliente obtiene los datos de un cliente desde el ledger.
@@ -318,6 +369,13 @@ func ActualizarCliente(c *gin.Context) {
 		return
 	}
 
+	publicarNotificacion(c,
+		notificador.EventoClienteEditado,
+		normalizado.ClienteId,
+		result.TxID,
+		fmt.Sprintf("Cliente %s editado", normalizado.ClienteId),
+	)
+
 	c.JSON(http.StatusOK, models.RespuestaExitoTx{
 		Ok:      true,
 		TxId:    result.TxID,
@@ -405,6 +463,13 @@ func DarBajaCliente(c *gin.Context) {
 		})
 		return
 	}
+
+	publicarNotificacion(c,
+		notificador.EventoClienteDadoDeBaja,
+		clienteId,
+		result.TxID,
+		fmt.Sprintf("Cliente %s dado de baja", clienteId),
+	)
 
 	c.JSON(http.StatusOK, models.RespuestaExitoTx{
 		Ok:      true,
@@ -697,196 +762,10 @@ func ConsultarLineaTiempoCliente(c *gin.Context) {
 	})
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SISTEMA DE BORRADORES Y CONTROL DE VERSIONES (Git-like)
-// ─────────────────────────────────────────────────────────────────────────────
+// NOTA: El sistema "draft → commit → rollback → versiones" se eliminó.
+// Hyperledger Fabric ya garantiza historial inmutable por activo a través
+// de GetAssetHistory (ver ObtenerHistorialCliente y ObtenerLineaTiempo más
+// arriba). Un flujo de "borrador" en chaincode contaminaba el world state
+// con activos auxiliares (_DRAFT, _REV_N) y duplicaba transacciones por
+// edición sin aportar valor real al auditor.
 
-// CrearBorrador crea una copia de trabajo (draft) del cliente en el ledger.
-// POST /clientes/:clienteId/draft
-func CrearBorrador(c *gin.Context) {
-	clienteId := strings.TrimSpace(c.Param("clienteId"))
-	if clienteId == "" {
-		c.JSON(http.StatusBadRequest, models.RespuestaError{Ok: false, Codigo: "VALIDACION", Mensaje: "clienteId es obligatorio"})
-		return
-	}
-	chaincode := strings.TrimSpace(os.Getenv("CHAINCODE_NAME"))
-	if chaincode == "" {
-		c.JSON(http.StatusInternalServerError, models.RespuestaError{Ok: false, Codigo: "CONFIGURACION", Mensaje: "No se encontró CHAINCODE_NAME en variables de entorno"})
-		return
-	}
-
-	result, err := fabric.InvokeTransactionWithTxID(chaincode, "CrearBorrador", clienteId)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.RespuestaError{
-			Ok:      false,
-			Codigo:  "ERROR_FABRIC",
-			Mensaje: "Error al crear el borrador en Blockchain: " + err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusCreated, models.RespuestaExitoTx{
-		Ok:      true,
-		TxId:    result.TxID,
-		Mensaje: fmt.Sprintf("Borrador creado para el cliente %s. Puede editarlo sin afectar el registro oficial.", clienteId),
-	})
-}
-
-// ActualizarBorrador modifica los campos del borrador activo del cliente (no toca el registro oficial).
-// PUT /clientes/:clienteId/draft
-func ActualizarBorrador(c *gin.Context) {
-	clienteId := strings.TrimSpace(c.Param("clienteId"))
-	if clienteId == "" {
-		c.JSON(http.StatusBadRequest, models.RespuestaError{Ok: false, Codigo: "VALIDACION", Mensaje: "clienteId es obligatorio"})
-		return
-	}
-	chaincode := strings.TrimSpace(os.Getenv("CHAINCODE_NAME"))
-	if chaincode == "" {
-		c.JSON(http.StatusInternalServerError, models.RespuestaError{Ok: false, Codigo: "CONFIGURACION", Mensaje: "No se encontró CHAINCODE_NAME en variables de entorno"})
-		return
-	}
-
-	var patch models.ClientePatch
-	if err := c.ShouldBindJSON(&patch); err != nil {
-		c.JSON(http.StatusBadRequest, models.RespuestaError{Ok: false, Codigo: "VALIDACION", Mensaje: err.Error()})
-		return
-	}
-
-	// Leer el borrador actual para hacer merge de campos
-	draftId := clienteId + "_DRAFT"
-	rawDraft, err := fabric.EvaluateTransaction(chaincode, "ReadAsset", draftId)
-	if err != nil {
-		c.JSON(http.StatusNotFound, models.RespuestaError{
-			Ok:      false,
-			Codigo:  "BORRADOR_NO_ENCONTRADO",
-			Mensaje: "No existe un borrador activo para " + clienteId + ". Use POST /clientes/" + clienteId + "/draft primero.",
-		})
-		return
-	}
-	var draftActual models.Cliente
-	if err := json.Unmarshal(rawDraft, &draftActual); err != nil {
-		c.JSON(http.StatusInternalServerError, models.RespuestaError{Ok: false, Codigo: "ERROR_FORMATO", Mensaje: "Error al interpretar el borrador"})
-		return
-	}
-
-	merged, err := mergeClientePatch(draftActual, patch)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, models.RespuestaError{Ok: false, Codigo: "VALIDACION", Mensaje: err.Error()})
-		return
-	}
-
-	result, err := fabric.InvokeTransactionWithTxID(chaincode, "ActualizarBorrador",
-		clienteId, merged.Nombre, merged.TipoDocumento, merged.NumeroDocumento,
-		merged.FechaAlta, merged.Estado, merged.Telefono, merged.Email, merged.Notas,
-	)
-	if err != nil {
-		if strings.Contains(err.Error(), "EL_BORRADOR_NO_EXISTE") {
-			c.JSON(http.StatusNotFound, models.RespuestaError{Ok: false, Codigo: "BORRADOR_NO_ENCONTRADO", Mensaje: "No existe borrador activo. Use POST /clientes/" + clienteId + "/draft primero."})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, models.RespuestaError{Ok: false, Codigo: "ERROR_FABRIC", Mensaje: "Error al actualizar el borrador: " + err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, models.RespuestaExitoTx{
-		Ok:      true,
-		TxId:    result.TxID,
-		Mensaje: "Borrador actualizado. Los cambios aún no están en producción. Use POST /commit para publicar.",
-	})
-}
-
-// ConfirmarBorrador hace "merge" del borrador al registro oficial y guarda el histórico.
-// POST /clientes/:clienteId/commit
-func ConfirmarBorrador(c *gin.Context) {
-	clienteId := strings.TrimSpace(c.Param("clienteId"))
-	if clienteId == "" {
-		c.JSON(http.StatusBadRequest, models.RespuestaError{Ok: false, Codigo: "VALIDACION", Mensaje: "clienteId es obligatorio"})
-		return
-	}
-	chaincode := strings.TrimSpace(os.Getenv("CHAINCODE_NAME"))
-	if chaincode == "" {
-		c.JSON(http.StatusInternalServerError, models.RespuestaError{Ok: false, Codigo: "CONFIGURACION", Mensaje: "No se encontró CHAINCODE_NAME en variables de entorno"})
-		return
-	}
-
-	result, err := fabric.InvokeTransactionWithTxID(chaincode, "ConfirmarBorrador", clienteId)
-	if err != nil {
-		if strings.Contains(err.Error(), "EL_BORRADOR_NO_EXISTE") {
-			c.JSON(http.StatusNotFound, models.RespuestaError{Ok: false, Codigo: "BORRADOR_NO_ENCONTRADO", Mensaje: "No hay borrador activo para confirmar en " + clienteId})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, models.RespuestaError{Ok: false, Codigo: "ERROR_FABRIC", Mensaje: "Error al confirmar el borrador: " + err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, models.RespuestaExitoTx{
-		Ok:      true,
-		TxId:    result.TxID,
-		Mensaje: "¡Commit exitoso! El borrador fue publicado al registro oficial. La versión anterior quedó guardada como historial inmutable.",
-	})
-}
-
-// RevertirARevision restaura el registro oficial del cliente a una revisión histórica anterior.
-// POST /clientes/:clienteId/rollback/:revision
-func RevertirARevision(c *gin.Context) {
-	clienteId := strings.TrimSpace(c.Param("clienteId"))
-	revision := strings.TrimSpace(c.Param("revision"))
-	if clienteId == "" || revision == "" {
-		c.JSON(http.StatusBadRequest, models.RespuestaError{Ok: false, Codigo: "VALIDACION", Mensaje: "clienteId y revision son obligatorios"})
-		return
-	}
-	chaincode := strings.TrimSpace(os.Getenv("CHAINCODE_NAME"))
-	if chaincode == "" {
-		c.JSON(http.StatusInternalServerError, models.RespuestaError{Ok: false, Codigo: "CONFIGURACION", Mensaje: "No se encontró CHAINCODE_NAME en variables de entorno"})
-		return
-	}
-
-	result, err := fabric.InvokeTransactionWithTxID(chaincode, "RevertirARevision", clienteId, revision)
-	if err != nil {
-		if strings.Contains(err.Error(), "VERSION_NO_ENCONTRADA") {
-			c.JSON(http.StatusNotFound, models.RespuestaError{Ok: false, Codigo: "VERSION_NO_ENCONTRADA", Mensaje: fmt.Sprintf("No existe la revisión %s para el cliente %s", revision, clienteId)})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, models.RespuestaError{Ok: false, Codigo: "ERROR_FABRIC", Mensaje: "Error al revertir a revisión: " + err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, models.RespuestaExitoTx{
-		Ok:      true,
-		TxId:    result.TxID,
-		Mensaje: fmt.Sprintf("Rollback exitoso. El cliente %s fue restaurado a la revisión %s.", clienteId, revision),
-	})
-}
-
-// ObtenerHistorialRevisiones devuelve la lista de todas las revisiones históricas congeladas del cliente.
-// GET /clientes/:clienteId/versiones
-func ObtenerHistorialRevisiones(c *gin.Context) {
-	clienteId := strings.TrimSpace(c.Param("clienteId"))
-	if clienteId == "" {
-		c.JSON(http.StatusBadRequest, models.RespuestaError{Ok: false, Codigo: "VALIDACION", Mensaje: "clienteId es obligatorio"})
-		return
-	}
-	chaincode := strings.TrimSpace(os.Getenv("CHAINCODE_NAME"))
-	if chaincode == "" {
-		c.JSON(http.StatusInternalServerError, models.RespuestaError{Ok: false, Codigo: "CONFIGURACION", Mensaje: "No se encontró CHAINCODE_NAME en variables de entorno"})
-		return
-	}
-
-	raw, err := fabric.EvaluateTransaction(chaincode, "ObtenerHistorialRevisiones", clienteId)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.RespuestaError{Ok: false, Codigo: "ERROR_FABRIC", Mensaje: "Error al obtener historial de revisiones: " + err.Error()})
-		return
-	}
-
-	var revisiones []models.Cliente
-	if err := json.Unmarshal(raw, &revisiones); err != nil || revisiones == nil {
-		revisiones = []models.Cliente{}
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"ok":        true,
-		"clienteId": clienteId,
-		"total":     len(revisiones),
-		"revisiones": revisiones,
-	})
-}

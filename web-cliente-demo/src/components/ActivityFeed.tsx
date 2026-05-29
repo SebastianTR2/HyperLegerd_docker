@@ -26,6 +26,8 @@ interface ActivityFeedProps {
   showHistorialLink?: boolean
   className?: string
   bodyClassName?: string
+  /** Si se pasa, muestra un botón para limpiar la actividad. */
+  onClear?: () => void
 }
 
 export function ActivityFeed({
@@ -36,14 +38,28 @@ export function ActivityFeed({
   showHistorialLink = true,
   className = '',
   bodyClassName = '',
+  onClear,
 }: ActivityFeedProps) {
   return (
     <div
       className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-line bg-elevated/90 shadow-card ${className}`}
     >
-      <div className="shrink-0 border-b border-line px-4 py-3 sm:px-5">
-        <h2 className="text-sm font-semibold text-slate-100">{title}</h2>
-        <p className="text-xs text-muted">{subtitle}</p>
+      <div className="flex shrink-0 items-start justify-between gap-2 border-b border-line px-4 py-3 sm:px-5">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-slate-100">{title}</h2>
+          <p className="text-xs text-muted">{subtitle}</p>
+        </div>
+        {onClear ? (
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={items.length === 0}
+            className="shrink-0 rounded-lg border border-line bg-surface/60 px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:bg-elevated hover:text-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+            title="Borrar la actividad reciente de esta sesión"
+          >
+            Limpiar
+          </button>
+        ) : null}
       </div>
       <div className={`min-h-0 flex-1 space-y-2 overflow-y-auto p-3 sm:p-4 ${bodyClassName}`}>
         {items.length === 0 ? (

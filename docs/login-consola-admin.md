@@ -219,10 +219,10 @@ del cliente o vía API directa, no desde esta consola.
 
 ## 7. Limitaciones conocidas
 
-- **Revocación in-memory**: el logout marca el JTI en una lista en RAM.
-  Si reinicias el BFF antes de que expire el token, ese token volverá a
-  ser válido. Suficiente para MVP; para producción sustituir por una
-  tabla SQLite (igual que el portal-cliente final).
+- **Revocación persistente en SQLite**: el logout marca el JTI en la tabla
+  `sessions` del BFF, por lo que reiniciar el proceso ya no reactiva el token.
+  Recomendación futura para alta escala: TTL/limpieza periódica de sesiones
+  expiradas y métricas de almacenamiento.
 - **No hay refresh tokens**: los JWT viven 8 h por defecto
   (`JWT_EXPIRY_HOURS`). Al expirar, el frontend redirige a `/login`.
 - **El YAML no se hot-reload**: cambios requieren reiniciar el BFF.
@@ -243,3 +243,10 @@ pruebas), basta con:
 
 No se recomienda hacerlo: el login es ahora el flujo de referencia y las
 notificaciones dependen de la identidad real del JWT.
+
+## 9. Documentos operativos complementarios
+
+Para operación diaria y aprobación de salida antes de integrar nuevas webs:
+
+- `docs/runbook-web-puente.md` — arranque, smoke test y diagnóstico rápido.
+- `docs/qa-web-puente-checklist.md` — checklist QA por fases con criterio Go/No-Go.

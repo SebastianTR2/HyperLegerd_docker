@@ -8,9 +8,11 @@
 package handlers
 
 import (
+	"database/sql"
+	"errors"
+	"log"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -29,45 +31,61 @@ const ScopeAdminConsole = "admin-console"
 type AdminAuthHandler struct {
 	Cfg      config.Config
 	Registro *usuariosadmin.Registry
-	// JTIRevocados mantiene un set en memoria de tokens cerrados (logout).
-	// Para producción real conviene una tabla; en MVP es suficiente.
-	JTIRevocados *RevocacionesMemoria
+	Revocador AdminRevocador
 }
 
-type RevocacionesMemoria struct {
-	mu   sync.RWMutex
-	jtis map[string]time.Time
+// AdminRevocador abstrae la persistencia de sesiones de la consola admin.
+type AdminRevocador interface {
+	RegistrarSesion(userID, jti string, exp time.Time) error
+	Revocar(jti string) error
+	Revocado(jti string) bool
 }
 
-func NuevaRevocacionesMemoria() *RevocacionesMemoria {
-	return &RevocacionesMemoria{jtis: make(map[string]time.Time)}
+// RevocacionesPersistentes guarda JTI en SQLite usando la tabla sessions
+// existente del BFF. Esto evita que un reinicio del proceso reactive tokens.
+type RevocacionesPersistentes struct {
+	DB *sql.DB
 }
 
-func (r *RevocacionesMemoria) Revocar(jti string, exp time.Time) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.jtis[jti] = exp
-	if len(r.jtis) > 256 {
-		now := time.Now()
-		for k, e := range r.jtis {
-			if now.After(e) {
-				delete(r.jtis, k)
-			}
+func NuevaRevocacionesPersistentes(db *sql.DB) *RevocacionesPersistentes {
+	return &RevocacionesPersistentes{DB: db}
+}
+
+func (r *RevocacionesPersistentes) RegistrarSesion(userID, jti string, exp time.Time) error {
+	_, err := r.DB.Exec(
+		`INSERT INTO admin_sessions (id, username, jti, expires_at) VALUES (?, ?, ?, ?)`,
+		uuid.NewString(), userID, jti, exp.UTC().Format(time.RFC3339),
+	)
+	return err
+}
+
+func (r *RevocacionesPersistentes) Revocar(jti string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := r.DB.Exec(`UPDATE admin_sessions SET revoked_at = ? WHERE jti = ? AND revoked_at IS NULL`, now, jti)
+	return err
+}
+
+func (r *RevocacionesPersistentes) Revocado(jti string) bool {
+	var revoked sql.NullString
+	var expires string
+	err := r.DB.QueryRow(`SELECT revoked_at, expires_at FROM admin_sessions WHERE jti = ?`, jti).Scan(&revoked, &expires)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return true
 		}
+		log.Printf("admin auth: error verificando sesión %s: %v", jti, err)
+		return true
 	}
-}
-
-func (r *RevocacionesMemoria) Revocado(jti string) bool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	exp, ok := r.jtis[jti]
-	if !ok {
-		return false
+	if revoked.Valid && strings.TrimSpace(revoked.String) != "" {
+		return true
 	}
-	if time.Now().After(exp) {
-		return false
+	exp, err := time.Parse(time.RFC3339, expires)
+	if err != nil {
+		log.Printf("admin auth: error verificando sesión %s: %v", jti, err)
+		// Fail closed: ante error de sesión tratamos el token como inválido.
+		return true
 	}
-	return true
+	return !time.Now().UTC().Before(exp)
 }
 
 // UsuarioAdminPublico es el shape devuelto al frontend (sin hash).
@@ -142,6 +160,7 @@ func (h *AdminAuthHandler) Login(c *gin.Context) {
 	if exp == 0 {
 		exp = 8 * time.Hour
 	}
+	expiresAt := time.Now().Add(exp)
 	token, err := auth.IssueTokenExt(
 		h.Cfg.JWTSecret,
 		u.Usuario, u.Usuario, u.NombreCompleto, u.Rol,
@@ -153,6 +172,15 @@ func (h *AdminAuthHandler) Login(c *gin.Context) {
 			Mensaje: "No se pudo emitir el token",
 		})
 		return
+	}
+	if h.Revocador != nil {
+		if err := h.Revocador.RegistrarSesion(u.Usuario, jti, expiresAt); err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+				Ok: false, Codigo: "ERROR_INTERNO",
+				Mensaje: "No se pudo registrar la sesión",
+			})
+			return
+		}
 	}
 	c.JSON(http.StatusOK, LoginAdminResponse{
 		Ok:    true,
@@ -187,21 +215,21 @@ func (h *AdminAuthHandler) Me(c *gin.Context) {
 	})
 }
 
-// Logout añade el JTI a la lista de revocados.
+// Logout marca el JTI como revocado en almacenamiento persistente.
 func (h *AdminAuthHandler) Logout(c *gin.Context) {
 	cl, ok := AdminClaimsFromContext(c)
 	if !ok {
 		c.JSON(http.StatusOK, gin.H{"ok": true, "mensaje": "Sesión cerrada"})
 		return
 	}
-	if h.JTIRevocados != nil && cl.ID != "" {
-		var exp time.Time
-		if cl.ExpiresAt != nil {
-			exp = cl.ExpiresAt.Time
-		} else {
-			exp = time.Now().Add(8 * time.Hour)
+	if h.Revocador != nil && cl.ID != "" {
+		if err := h.Revocador.Revocar(cl.ID); err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+				Ok: false, Codigo: "ERROR_INTERNO",
+				Mensaje: "No se pudo cerrar la sesión",
+			})
+			return
 		}
-		h.JTIRevocados.Revocar(cl.ID, exp)
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true, "mensaje": "Sesión cerrada"})
 }

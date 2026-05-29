@@ -8,8 +8,8 @@ import type { TraceEntry, TraceOperationType } from '../types/demo'
 // Filtros para trazabilidad. La consola es audit-only y no maneja tokens.
 const filtrosBase: { id: TraceOperationType | 'all'; label: string }[] = [
   { id: 'all', label: 'Todas' },
-  { id: 'CLIENTE_REGISTRADO', label: 'Cliente registrado' },
-  { id: 'CLIENTE_CONSULTADO', label: 'Cliente consultado' },
+  { id: 'CLIENTE_REGISTRADO', label: 'Registro creado' },
+  { id: 'CLIENTE_CONSULTADO', label: 'Registro consultado' },
   { id: 'ERROR_PERMISOS', label: 'Errores de permisos' },
   { id: 'ERROR_API', label: 'Errores API' },
 ]
@@ -111,7 +111,7 @@ function TraceCard({
         <Meta k="Fecha" v={formatDemoDateTime(trace.createdAt)} />
         <Meta k="Modo" v={trace.mode === 'api' ? 'Red / API' : 'Navegador (sin API)'} />
         <Meta k="Rol" v={roleLabel(trace.role)} />
-        {trace.clienteId ? <Meta k="clienteId" v={trace.clienteId} mono /> : null}
+        {trace.clienteId ? <Meta k="ID" v={trace.clienteId} mono /> : null}
         {trace.codigoToken ? (
           <Meta k="TOKEN" v={etiquetaTokenDemo(trace.codigoToken)} mono />
         ) : null}

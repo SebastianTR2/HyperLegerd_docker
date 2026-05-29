@@ -57,5 +57,10 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: { port: 5173, proxy },
     preview: { port: 5173, proxy },
+    test: {
+      environment: "jsdom",
+      globals: true,
+      setupFiles: "./src/test/setup.ts",
+    },
   };
 });

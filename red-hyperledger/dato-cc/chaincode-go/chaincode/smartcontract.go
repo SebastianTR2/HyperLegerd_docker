@@ -106,23 +106,19 @@ func (s *SmartContract) CreateDato(ctx contractapi.TransactionContextInterface, 
 	return ctx.GetStub().PutState(datoID, bytes)
 }
 
-// ReadDato devuelve el dato indicado.
-func (s *SmartContract) ReadDato(ctx contractapi.TransactionContextInterface, datoID string) (*Dato, error) {
+// ReadDato devuelve el dato indicado como JSON (string) para compatibilidad con evaluate/query.
+func (s *SmartContract) ReadDato(ctx contractapi.TransactionContextInterface, datoID string) (string, error) {
 	if strings.TrimSpace(datoID) == "" {
-		return nil, fmt.Errorf("datoId obligatorio")
+		return "", fmt.Errorf("datoId obligatorio")
 	}
 	bytes, err := ctx.GetStub().GetState(datoID)
 	if err != nil {
-		return nil, fmt.Errorf("read state: %w", err)
+		return "", fmt.Errorf("read state: %w", err)
 	}
 	if bytes == nil {
-		return nil, fmt.Errorf("el dato %s no existe", datoID)
+		return "", fmt.Errorf("el dato %s no existe", datoID)
 	}
-	var d Dato
-	if err := json.Unmarshal(bytes, &d); err != nil {
-		return nil, fmt.Errorf("decode dato: %w", err)
-	}
-	return &d, nil
+	return string(bytes), nil
 }
 
 // UpdateDato modifica un dato existente conservando su fecha de creación.
@@ -130,9 +126,16 @@ func (s *SmartContract) UpdateDato(ctx contractapi.TransactionContextInterface, 
 	if err := validarEntradaCreacion(datoID, tipo, payloadJSON); err != nil {
 		return err
 	}
-	prev, err := s.ReadDato(ctx, datoID)
+	raw, err := ctx.GetStub().GetState(datoID)
 	if err != nil {
-		return err
+		return fmt.Errorf("read state: %w", err)
+	}
+	if raw == nil {
+		return fmt.Errorf("el dato %s no existe", datoID)
+	}
+	var prev Dato
+	if err := json.Unmarshal(raw, &prev); err != nil {
+		return fmt.Errorf("decode dato: %w", err)
 	}
 	prev.Tipo = tipo
 	prev.Payload = json.RawMessage(payloadJSON)
@@ -166,19 +169,19 @@ func (s *SmartContract) DatoExists(ctx contractapi.TransactionContextInterface, 
 	return bytes != nil, nil
 }
 
-// GetAllDatos recorre el world state y devuelve todos los datos.
+// GetAllDatos recorre el world state y devuelve todos los datos como JSON array (string).
 // Recomendado solo para canales pequeños o paginar en el futuro.
-func (s *SmartContract) GetAllDatos(ctx contractapi.TransactionContextInterface) ([]*Dato, error) {
+func (s *SmartContract) GetAllDatos(ctx contractapi.TransactionContextInterface) (string, error) {
 	it, err := ctx.GetStub().GetStateByRange("", "")
 	if err != nil {
-		return nil, fmt.Errorf("iterar world state: %w", err)
+		return "", fmt.Errorf("iterar world state: %w", err)
 	}
 	defer it.Close()
 	var datos []*Dato
 	for it.HasNext() {
 		kv, err := it.Next()
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		var d Dato
 		if err := json.Unmarshal(kv.Value, &d); err != nil {
@@ -187,24 +190,28 @@ func (s *SmartContract) GetAllDatos(ctx contractapi.TransactionContextInterface)
 		datos = append(datos, &d)
 	}
 	sort.Slice(datos, func(i, j int) bool { return datos[i].DatoID < datos[j].DatoID })
-	return datos, nil
+	bytes, err := json.Marshal(datos)
+	if err != nil {
+		return "", fmt.Errorf("marshal datos: %w", err)
+	}
+	return string(bytes), nil
 }
 
-// GetDatoHistory devuelve el historial inmutable del dato (más reciente primero).
-func (s *SmartContract) GetDatoHistory(ctx contractapi.TransactionContextInterface, datoID string) ([]HistoryEntry, error) {
+// GetDatoHistory devuelve el historial inmutable del dato (más reciente primero) como JSON (string).
+func (s *SmartContract) GetDatoHistory(ctx contractapi.TransactionContextInterface, datoID string) (string, error) {
 	if strings.TrimSpace(datoID) == "" {
-		return nil, fmt.Errorf("datoId obligatorio")
+		return "", fmt.Errorf("datoId obligatorio")
 	}
 	it, err := ctx.GetStub().GetHistoryForKey(datoID)
 	if err != nil {
-		return nil, fmt.Errorf("history for key: %w", err)
+		return "", fmt.Errorf("history for key: %w", err)
 	}
 	defer it.Close()
 	var out []HistoryEntry
 	for it.HasNext() {
 		mod, err := it.Next()
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		entry := HistoryEntry{
 			TxID:     mod.TxId,
@@ -222,5 +229,9 @@ func (s *SmartContract) GetDatoHistory(ctx contractapi.TransactionContextInterfa
 	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
 		out[i], out[j] = out[j], out[i]
 	}
-	return out, nil
+	bytes, err := json.Marshal(out)
+	if err != nil {
+		return "", fmt.Errorf("marshal history: %w", err)
+	}
+	return string(bytes), nil
 }

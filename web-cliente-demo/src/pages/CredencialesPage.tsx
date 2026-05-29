@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useSettings } from '../context/SettingsContext'
+import { etiquetaOrganizacion } from '../lib/organizacion'
 import { rolePermissions, workspaceLabel } from '../lib/roles'
 
 /**
@@ -25,7 +26,12 @@ export default function CredencialesPage() {
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatusTile label="Nombre" value={nombreUsuario || '—'} tone="ok" help="Tal como lo registró el operador del BaaS." />
           <StatusTile label="Usuario" value={usuario?.usuario ?? '—'} tone="info" help="Identificador para iniciar sesión." />
-          <StatusTile label="Tenant" value={tenant || '—'} tone="info" help="Inquilino al que pertenece la cuenta." />
+          <StatusTile
+            label="Organización"
+            value={etiquetaOrganizacion(tenant)}
+            tone="info"
+            help="Empresa o espacio de datos al que pertenece tu cuenta."
+          />
           <StatusTile label="Rol" value={roleLabel} tone="ok" help="Determina los permisos y la X-API-Key del backend." />
           <StatusTile label="Espacio" value={workspace} tone="info" help="Interfaz adaptada al rol." />
         </div>

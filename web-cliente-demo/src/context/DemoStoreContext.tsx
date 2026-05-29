@@ -77,6 +77,8 @@ interface DemoStoreValue {
   consultar: (query: string) => ConsultaResult
   /** Añade evento al historial (p. ej. respuesta API real). */
   mergeExternalEvent: (ev: Omit<DemoEvent, 'id' | 'fechaIso'> & { fechaIso?: string }) => void
+  /** Limpia la actividad reciente de esta sesión (navegador). */
+  limpiarEventos: () => void
   /** Añade operación token al listado (p. ej. txId real). */
   mergeExternalTokenOp: (op: TokenOperacion) => void
   pushTrace: (trace: Omit<TraceEntry, 'id' | 'createdAt'> & { createdAt?: string }) => TraceEntry
@@ -113,7 +115,7 @@ function appendEvent(prev: DemoEvent[], ev: Omit<DemoEvent, 'id' | 'fechaIso'> &
 }
 
 export function DemoStoreProvider({ children }: { children: ReactNode }) {
-  const { mode, apiKey } = useSettings()
+  const { mode, apiKey, tenant } = useSettings()
   const boot = useRef(loadDemoState())
   const [registros, setRegistros] = useState<Registro[]>(() => boot.current.registros)
   const [eventos, setEventos] = useState<DemoEvent[]>(() => boot.current.eventos)
@@ -131,7 +133,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
     setClientesLedgerError(null)
     setClientesLedgerAccessDenied(false)
     try {
-      const list = await listarClientesApi()
+      const list = await listarClientesApi(tenant)
       setClientesLedger(list)
     } catch (e) {
       setClientesLedger([])
@@ -140,7 +142,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
     } finally {
       setClientesLedgerLoading(false)
     }
-  }, [])
+  }, [tenant])
 
   useEffect(() => {
     if (mode !== 'api') {
@@ -339,6 +341,11 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
     setEventos((e) => appendEvent(e, ev))
   }, [])
 
+  const limpiarEventos = useCallback(() => {
+    setEventos([])
+    showToast('Actividad reciente limpiada.', 'success')
+  }, [showToast])
+
   const mergeExternalTokenOp = useCallback((op: TokenOperacion) => {
     setTokenOps((list) => [op, ...list].slice(0, 120))
   }, [])
@@ -425,6 +432,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       transferToken,
       consultar,
       mergeExternalEvent,
+      limpiarEventos,
       mergeExternalTokenOp,
       pushTrace,
       toasts,
@@ -450,6 +458,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       transferToken,
       consultar,
       mergeExternalEvent,
+      limpiarEventos,
       mergeExternalTokenOp,
       pushTrace,
       toasts,

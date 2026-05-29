@@ -94,6 +94,29 @@ func (b *BrokerSSE) Broadcast(ev EventoNotificacion) {
 	}
 }
 
+// PurgarPorTenant elimina del histórico los eventos del tenant indicado y
+// devuelve cuántos se quitaron. Si tenant es vacío, vacía todo el histórico.
+func (b *BrokerSSE) PurgarPorTenant(tenant string) int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if tenant == "" {
+		n := len(b.historial)
+		b.historial = b.historial[:0]
+		return n
+	}
+	conservados := b.historial[:0:0]
+	quitados := 0
+	for _, ev := range b.historial {
+		if ev.Tenant == tenant {
+			quitados++
+			continue
+		}
+		conservados = append(conservados, ev)
+	}
+	b.historial = conservados
+	return quitados
+}
+
 // HistorialPorTenant devuelve los últimos eventos para un tenant (lo último primero).
 // Si tenant es vacío, devuelve todos.
 func (b *BrokerSSE) HistorialPorTenant(tenant string) []EventoNotificacion {

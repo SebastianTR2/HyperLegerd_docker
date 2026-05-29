@@ -18,7 +18,7 @@ function filtrosHistorial(): typeof filtrosHistorialLista {
 }
 
 export default function HistorialPage() {
-  const { eventos } = useDemoStore()
+  const { eventos, limpiarEventos } = useDemoStore()
   const [tipo, setTipo] = useState<DemoEventType | 'all'>('all')
 
   const filtrados = useMemo(() => {
@@ -56,6 +56,7 @@ export default function HistorialPage() {
         }
         showHistorialLink={false}
         className="min-h-0 flex-1"
+        onClear={limpiarEventos}
       />
     </div>
   )

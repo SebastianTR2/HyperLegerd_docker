@@ -1,6 +1,8 @@
 interface StatSummaryProps {
-  /** Cantidad devuelta por GET /clientes (ledger). */
+  /** Cantidad devuelta por GET /clientes o GET /datos (ledger). */
   totalClientesEnRed: number
+  entityLabel?: string
+  ledgerEndpointHint?: string
   tokenOpsCount?: number
   consultasCount?: number
   eventosCount?: number
@@ -11,6 +13,8 @@ interface StatSummaryProps {
 
 export function StatSummary({
   totalClientesEnRed,
+  entityLabel = 'Clientes registrados',
+  ledgerEndpointHint = 'Datos del ledger vía GET /clientes o GET /datos',
   tokenOpsCount = 0,
   consultasCount = 0,
   eventosCount = 0,
@@ -26,9 +30,9 @@ export function StatSummary({
     highlight?: boolean
   }[] = [
     {
-      label: 'Clientes registrados',
+      label: entityLabel,
       value: totalClientesEnRed.toLocaleString('es-PE'),
-      hint: 'Datos del ledger vía GET /clientes',
+      hint: ledgerEndpointHint,
       trend: dataSourceLabel,
       trendUp: true,
     },

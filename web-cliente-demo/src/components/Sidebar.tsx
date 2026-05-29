@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import { NavLink } from 'react-router-dom'
 import type { AppRoutePath } from '../lib/roles'
+import { useSettings } from '../context/SettingsContext'
 
 interface SidebarProps {
   mobileOpen: boolean
@@ -14,17 +15,18 @@ type NavItem = {
   end?: boolean
 }
 
-const items: NavItem[] = [
-  { to: '/', label: 'Panel', icon: IconGrid, end: true },
-  { to: '/clientes-registrados', label: 'Clientes en red', icon: IconList },
-  { to: '/consultas', label: 'Consultas', icon: IconSearch },
-  { to: '/auditoria', label: 'Auditar', icon: IconShield },
-  { to: '/historial', label: 'Historial', icon: IconClock },
-  { to: '/trazabilidad', label: 'Trazabilidad', icon: IconFlow },
-  { to: '/credenciales', label: 'Perfil', icon: IconKey },
-]
-
 export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
+  const { tenant } = useSettings()
+  const isAgricultura = tenant.trim().toLowerCase() === 'agricultura'
+  const items: NavItem[] = [
+    { to: '/', label: 'Panel', icon: IconGrid, end: true },
+    { to: '/clientes-registrados', label: isAgricultura ? 'Registros en red' : 'Clientes en red', icon: IconList },
+    { to: '/consultas', label: isAgricultura ? 'Detalle de registro' : 'Consultas', icon: IconSearch },
+    { to: '/auditoria', label: 'Auditar', icon: IconShield },
+    { to: '/historial', label: 'Historial', icon: IconClock },
+    { to: '/trazabilidad', label: 'Trazabilidad', icon: IconFlow },
+    { to: '/credenciales', label: 'Perfil', icon: IconKey },
+  ]
   return (
     <>
       {mobileOpen ? (

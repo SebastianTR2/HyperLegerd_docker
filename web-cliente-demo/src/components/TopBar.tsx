@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useSettings } from '../context/SettingsContext'
+import { etiquetaOrganizacion } from '../lib/organizacion'
 import { workspaceLabel } from '../lib/roles'
 import { NotificacionesAdminPanel } from './NotificacionesAdminPanel'
 
@@ -51,6 +52,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { mode, role, roleLabel, tenant, nombreUsuario } = useSettings()
+  const isAgricultura = tenant.trim().toLowerCase() === 'agricultura'
   const { usuario, logout } = useAuth()
   const [menuAbierto, setMenuAbierto] = useState(false)
   const workspace = workspaceLabel(role)
@@ -63,11 +65,22 @@ export function TopBar({ onMenuClick }: TopBarProps) {
       }
     }
     const base = SECTION_META[pathname] ?? SECTION_META['/']
+    if (pathname === '/clientes-registrados') {
+      return {
+        ...base,
+        subtitle: isAgricultura ? 'Listado de solo lectura desde GET /api/datos' : base.subtitle,
+      }
+    }
     if (pathname === '/consultas') {
-      return { ...base, subtitle: 'GET /api/clientes/:clienteId (proxy al middleware)' }
+      return {
+        ...base,
+        subtitle: isAgricultura
+          ? 'GET /api/datos/:datoId (proxy al middleware)'
+          : 'GET /api/clientes/:clienteId (proxy al middleware)',
+      }
     }
     return base
-  }, [pathname])
+  }, [isAgricultura, pathname])
 
   return (
     <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface/80 px-4 py-3 backdrop-blur-md sm:gap-4 sm:px-6">
@@ -100,7 +113,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
         <div className="hidden items-center gap-3 md:flex">
           {tenant && (
             <span className="rounded-full border border-line bg-elevated px-3 py-1 text-xs font-medium text-slate-300">
-              Tenant: <span className="text-slate-200">{tenant}</span>
+              Organización: <span className="text-slate-200">{etiquetaOrganizacion(tenant)}</span>
             </span>
           )}
           <span className="rounded-full border border-line bg-elevated px-3 py-1 text-xs font-medium text-slate-300">

@@ -97,6 +97,29 @@ func (b *EventBroker) GetHistorial() []EventoNormalizado {
 	return copia
 }
 
+// GetHistorialPorTenant retorna solo los eventos del tenant indicado. Esto evita
+// que un tenant (p. ej. agricultura) vea eventos de otro canal (p. ej. clientes),
+// ya que el broker es global y mezcla eventos de todos los canales. Los eventos
+// con tenant vacío (modo legacy single-tenant) se incluyen siempre.
+func (b *EventBroker) GetHistorialPorTenant(tenant string) []EventoNormalizado {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	t := strings.TrimSpace(tenant)
+	if t == "" {
+		copia := make([]EventoNormalizado, len(b.historial))
+		copy(copia, b.historial)
+		return copia
+	}
+	out := make([]EventoNormalizado, 0, len(b.historial))
+	for _, ev := range b.historial {
+		if ev.Tenant == "" || ev.Tenant == t {
+			out = append(out, ev)
+		}
+	}
+	return out
+}
+
 // StartEventListening inicia la escucha en el tenant por defecto (compat legacy).
 func StartEventListening(ctx context.Context, chaincodeName string) {
 	StartEventListeningTenant(ctx, "", "", chaincodeName)

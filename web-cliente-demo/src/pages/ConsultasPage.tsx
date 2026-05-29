@@ -3,8 +3,11 @@ import { useLocation } from 'react-router-dom'
 import { useDemoStore } from '../context/DemoStoreContext'
 import { useSettings } from '../context/SettingsContext'
 import { clienteApiToRegistro, parseClienteDesdeLectura } from '../lib/apiClienteAdapter'
+import { parseDatoDatos } from '../lib/datoApiAdapter'
 import { describeApiError } from '../lib/apiErrorMessage'
 import { consultarClienteApi } from '../services/apiClientes'
+import { consultarDatoApi } from '../services/apiDatos'
+import LoteProcesoPanel, { extraerPayloadLote } from '../components/LoteProcesoPanel'
 import { ApiHttpError } from '../services/apiClient'
 import type { ClienteApiCacheRow } from '../types/api'
 import type { Registro } from '../types/registro'
@@ -18,10 +21,15 @@ const btnPrimary =
 
 export default function ConsultasPage() {
   const location = useLocation()
-  const { mode, role, roleLabel } = useSettings()
+  const { mode, role, roleLabel, tenant } = useSettings()
+  const isAgricultura = tenant.trim().toLowerCase() === 'agricultura'
+  const endpointLabel = isAgricultura ? 'GET /datos/:datoId' : 'GET /clientes/:clienteId'
+  const idLabel = isAgricultura ? 'datoId' : 'clienteId'
+  const placeholder = isAgricultura ? 'AGRO-TEST-001' : 'CLI001'
   const { mergeExternalEvent, upsertApiClienteRow, showToast, pushTrace, refreshClientesLedger } = useDemoStore()
   const [clienteIdApi, setClienteIdApi] = useState('')
   const [lastApiRow, setLastApiRow] = useState<ClienteApiCacheRow | null>(null)
+  const [lastLotePayload, setLastLotePayload] = useState<Record<string, unknown> | null>(null)
   const [lastError, setLastError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -34,17 +42,21 @@ export default function ConsultasPage() {
     e.preventDefault()
     setLastError(null)
     setLastApiRow(null)
+    setLastLotePayload(null)
     const id = clienteIdApi.trim()
     if (!id) {
-      showToast('Indique el clienteId exacto (ej. CLI001).', 'error')
+      showToast(`Indique el ${idLabel} exacto (ej. ${placeholder}).`, 'error')
       return
     }
     try {
-      const res = await consultarClienteApi(id)
-      const parsed = parseClienteDesdeLectura(res)
+      const res = isAgricultura ? await consultarDatoApi(id) : await consultarClienteApi(id)
+      const parsed = isAgricultura ? parseDatoDatos(res.payloadDecodificado ?? res.datos) : parseClienteDesdeLectura(res)
       if (parsed) {
         upsertApiClienteRow(parsed)
         setLastApiRow(parsed)
+        if (isAgricultura) {
+          setLastLotePayload(extraerPayloadLote(res.payloadDecodificado ?? res.datos))
+        }
       } else {
         setLastError('Respuesta sin datos de cliente reconocibles.')
       }
@@ -85,7 +97,7 @@ export default function ConsultasPage() {
         mode,
         role,
         state: 'error',
-        message: `Error al consultar cliente ${id}.`,
+        message: `Error al consultar ${isAgricultura ? 'registro' : 'cliente'} ${id}.`,
         clienteId: id,
         httpStatus: e instanceof ApiHttpError ? e.status : undefined,
         errorCode: e instanceof ApiHttpError ? e.payload?.codigo : undefined,
@@ -106,23 +118,23 @@ export default function ConsultasPage() {
       <div>
         <h1 className="text-lg font-semibold text-slate-100">Consultas</h1>
         <p className="mt-1 text-sm text-muted">
-          Consulta administrativa por <strong className="text-slate-300">clienteId exacto</strong>. No se busca por nombre ni
-          por número de documento en esta pantalla. El alta de clientes se realiza desde el Portal de Cliente.
+          Consulta administrativa por <strong className="text-slate-300">{idLabel} exacto</strong>. No se busca por nombre en
+          esta pantalla.
         </p>
       </div>
 
       <form onSubmit={onSubmitApi} className="shrink-0 rounded-2xl border border-line bg-elevated/90 p-5 shadow-card">
         <h2 className="text-sm font-semibold text-slate-100">Consulta en cadena</h2>
         <p className="mt-1 text-xs text-muted">
-          Endpoint <code className="rounded bg-surface px-1 font-mono text-xs">GET /clientes/:clienteId</code> a través del proxy{' '}
-          <code className="rounded bg-surface px-1 font-mono text-xs">/api</code>. Ejemplo: <strong className="text-slate-400">CLI001</strong>.
+          Endpoint <code className="rounded bg-surface px-1 font-mono text-xs">{endpointLabel}</code> a través del proxy{' '}
+          <code className="rounded bg-surface px-1 font-mono text-xs">/api</code>. Ejemplo: <strong className="text-slate-400">{placeholder}</strong>.
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
           <input
             className={input}
             value={clienteIdApi}
             onChange={(e) => setClienteIdApi(e.target.value)}
-            placeholder="CLI001"
+            placeholder={placeholder}
             autoComplete="off"
             spellCheck={false}
           />
@@ -141,9 +153,16 @@ export default function ConsultasPage() {
           {lastError && !lastApiRow ? (
             <p className="text-sm text-danger/90">{lastError}</p>
           ) : apiRegistro ? (
-            <ApiResultView r={apiRegistro} informacionAuditoria={lastApiRow?.informacionAuditoria} />
+            <div className="space-y-6">
+              <ApiResultView r={apiRegistro} informacionAuditoria={lastApiRow?.informacionAuditoria} isAgricultura={isAgricultura} />
+              {isAgricultura && lastLotePayload ? (
+                <div className="border-t border-line/60 pt-5">
+                  <LoteProcesoPanel datos={lastLotePayload} titulo="Proceso del lote (estado actual)" />
+                </div>
+              ) : null}
+            </div>
           ) : (
-            <p className="text-sm text-muted">Ejecute una consulta con un clienteId válido.</p>
+            <p className="text-sm text-muted">Ejecute una consulta con un identificador válido.</p>
           )}
         </div>
       </div>
@@ -151,7 +170,15 @@ export default function ConsultasPage() {
   )
 }
 
-function ApiResultView({ r, informacionAuditoria }: { r: Registro; informacionAuditoria?: string | null }) {
+function ApiResultView({
+  r,
+  informacionAuditoria,
+  isAgricultura,
+}: {
+  r: Registro
+  informacionAuditoria?: string | null
+  isAgricultura: boolean
+}) {
   return (
     <div className="space-y-4">
       <div
@@ -169,7 +196,7 @@ function ApiResultView({ r, informacionAuditoria }: { r: Registro; informacionAu
       </div>
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <div>
-          <dt className="text-[11px] uppercase text-muted">clienteId</dt>
+          <dt className="text-[11px] uppercase text-muted">{isAgricultura ? 'datoId' : 'clienteId'}</dt>
           <dd className="mt-0.5 font-mono text-sm text-slate-200">{r.id}</dd>
         </div>
         <div>
@@ -177,7 +204,7 @@ function ApiResultView({ r, informacionAuditoria }: { r: Registro; informacionAu
           <dd className="mt-0.5 text-slate-200">{r.nombreCompleto}</dd>
         </div>
         <div>
-          <dt className="text-[11px] uppercase text-muted">Documento</dt>
+          <dt className="text-[11px] uppercase text-muted">{isAgricultura ? 'Código' : 'Documento'}</dt>
           <dd className="mt-0.5 text-slate-200">
             {r.tipoDocumento} {r.documento}
           </dd>
@@ -187,7 +214,7 @@ function ApiResultView({ r, informacionAuditoria }: { r: Registro; informacionAu
           <dd className="mt-0.5 text-slate-200">{formatShortDate(r.fechaRegistro)}</dd>
         </div>
         <div className="sm:col-span-2">
-          <dt className="text-[11px] uppercase text-muted">notas</dt>
+          <dt className="text-[11px] uppercase text-muted">{isAgricultura ? 'metadata' : 'notas'}</dt>
           <dd className="mt-0.5 text-slate-200">{r.facultad}</dd>
         </div>
         {r.email ? (

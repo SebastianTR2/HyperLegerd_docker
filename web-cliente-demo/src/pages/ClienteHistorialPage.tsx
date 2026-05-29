@@ -1,18 +1,24 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useSettings } from '../context/SettingsContext'
 import { describeApiError } from '../lib/apiErrorMessage'
 import { formatDemoDateTime } from '../lib/format'
 import { clienteFilasLegibles, displayClienteField } from '../lib/clienteDisplay'
 import { fetchHistorialCliente, fetchLineaTiempoCliente, operacionesAVista } from '../services/apiHistorialCliente'
+import { fetchHistorialDato } from '../services/apiDatos'
+import LoteProcesoPanel, { extraerPayloadLote } from '../components/LoteProcesoPanel'
 import type { HistorialFilaVista, AccionLineaTiempo } from '../services/apiHistorialCliente'
 
 const btn =
   'inline-flex items-center justify-center rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-slate-100 shadow-sm transition-colors hover:bg-accent-hover disabled:opacity-50'
 
 export default function ClienteHistorialPage() {
+  const { tenant } = useSettings()
+  const isAgricultura = tenant.trim().toLowerCase() === 'agricultura'
   const { clienteId: clienteIdParam } = useParams()
   const clienteId = decodeURIComponent(clienteIdParam ?? '').trim()
   const [rows, setRows] = useState<HistorialFilaVista[]>([])
+  const [lotePayloads, setLotePayloads] = useState<Array<Record<string, unknown> | null>>([])
   const [timeline, setTimeline] = useState<AccionLineaTiempo[]>([])
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
@@ -23,19 +29,48 @@ export default function ClienteHistorialPage() {
     setLoading(true)
     setError(null)
     try {
-      const [h, t] = await Promise.all([
-        fetchHistorialCliente(clienteId),
-        fetchLineaTiempoCliente(clienteId)
-      ])
-      setRows(operacionesAVista(h))
-      setTimeline(t.acciones)
+      if (isAgricultura) {
+        const r = await fetchHistorialDato(clienteId)
+        const datos = Array.isArray(r.datos) ? r.datos : []
+        const mapped = datos
+          .map((op: any) => ({
+            fila: {
+              txId: String(op?.txId ?? ''),
+              timestamp: String(op?.timestamp ?? ''),
+              isDelete: Boolean(op?.isDelete),
+              resumen: String(op?.record?.payload?.nombre ?? op?.record?.datoId ?? 'Sin registro'),
+              cliente: op?.record
+                ? {
+                    clienteId: String(op.record.datoId ?? ''),
+                    nombre: String(op.record.payload?.nombre ?? op.record.datoId ?? ''),
+                    tipoDocumento: 'LOTE',
+                    numeroDocumento: String(op.record.payload?.codigo_trazabilidad ?? ''),
+                    fechaAlta: String(op.record.fechaCreacion ?? op.timestamp ?? ''),
+                    estado: String(op.record.payload?.estado ?? op.record.tipo ?? 'ACTIVO'),
+                  }
+                : null,
+            } as HistorialFilaVista,
+            payload: extraerPayloadLote(op?.record),
+          }))
+          .filter((x) => x.fila.txId)
+          .sort((a, b) => new Date(a.fila.timestamp).getTime() - new Date(b.fila.timestamp).getTime())
+        setRows(mapped.map((x) => x.fila))
+        setLotePayloads(mapped.map((x) => x.payload))
+        setTimeline([])
+      } else {
+        const [h, t] = await Promise.all([fetchHistorialCliente(clienteId), fetchLineaTiempoCliente(clienteId)])
+        setRows(operacionesAVista(h))
+        setLotePayloads([])
+        setTimeline(t.acciones)
+      }
     } catch (e) {
       setError(describeApiError(e))
       setRows([])
+      setLotePayloads([])
     } finally {
       setLoading(false)
     }
-  }, [clienteId])
+  }, [clienteId, isAgricultura])
 
   useEffect(() => {
     void load()
@@ -59,7 +94,9 @@ export default function ClienteHistorialPage() {
           <h1 className="text-lg font-semibold text-slate-100">Historial en cadena</h1>
           <p className="mt-1 text-sm text-muted">
             Origen:{' '}
-            <code className="rounded bg-surface px-1 font-mono text-xs">GET /clientes/historial/{clienteId}</code>
+            <code className="rounded bg-surface px-1 font-mono text-xs">
+              {isAgricultura ? `GET /datos/${clienteId}/historial` : `GET /clientes/historial/${clienteId}`}
+            </code>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -71,7 +108,7 @@ export default function ClienteHistorialPage() {
             state={{ clienteId }}
             className="inline-flex items-center justify-center rounded-xl border border-line bg-surface/60 px-4 py-2.5 text-sm text-slate-200 hover:bg-elevated"
           >
-            Ver detalle (consulta)
+            Ver detalle
           </Link>
           <Link to="/clientes-registrados" className="inline-flex items-center justify-center rounded-xl border border-line px-4 py-2.5 text-sm text-muted hover:text-slate-200">
             Listado
@@ -175,7 +212,16 @@ export default function ClienteHistorialPage() {
             </div>
             <button onClick={() => setSelectedIdx(null)} className="rounded-lg bg-surface/60 px-3 py-1.5 text-xs text-slate-200 hover:bg-elevated">Cerrar</button>
           </div>
-          
+
+          {isAgricultura && lotePayloads[selectedIdx] ? (
+            <div className="mb-6 rounded-xl border border-line/60 bg-surface/20 p-4">
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
+                Proceso del lote en esta revisión
+              </p>
+              <LoteProcesoPanel datos={lotePayloads[selectedIdx]} titulo="Actividades y producciones registradas" />
+            </div>
+          ) : null}
+
           {selectedIdx === 0 ? (
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-emerald-400">

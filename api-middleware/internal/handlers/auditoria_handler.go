@@ -9,6 +9,7 @@ import (
 
 	"api-middleware/internal/bitacora"
 	"api-middleware/internal/fabric"
+	"api-middleware/internal/middleware"
 	"api-middleware/pkg/models"
 
 	"github.com/gin-gonic/gin"
@@ -38,7 +39,7 @@ func ListarAuditoriaHTTP(c *gin.Context) {
 func ListarAuditoriaCombinada(c *gin.Context) {
 	limite, desde, hasta := parseAuditoriaQuery(c)
 	httpLines := bitacora.ObtenerLineasAuditoriaMemoria(limite, desde, hasta)
-	eventos := fabric.GlobalEventBroker.GetHistorial()
+	eventos := fabric.GlobalEventBroker.GetHistorialPorTenant(middleware.TenantFromContext(c))
 	c.JSON(http.StatusOK, models.RespuestaLectura{
 		Ok:      true,
 		Codigo:  "CONSULTA_EXITOSA",

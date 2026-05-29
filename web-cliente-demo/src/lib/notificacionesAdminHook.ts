@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   fetchHistorialNotificacionesAdmin,
+  purgarNotificacionesAdmin,
   streamNotificacionesAdmin,
   type NotificacionAdmin,
   type StreamHandle,
@@ -24,6 +25,8 @@ interface UseNotificacionesResult {
   marcarLeidas: () => void
   /** Reintentar conexión manualmente. */
   reintentar: () => void
+  /** Limpia los avisos (servidor + vista). */
+  limpiar: () => Promise<void>
 }
 
 const MAX_HISTORIAL = 100
@@ -49,6 +52,15 @@ export function useNotificacionesAdmin({ activo, onNueva }: UseNotificacionesArg
 
   const marcarLeidas = useCallback(() => setNoLeidas(0), [])
   const reintentar = useCallback(() => setGeneracion((g) => g + 1), [])
+  const limpiar = useCallback(async () => {
+    try {
+      await purgarNotificacionesAdmin()
+    } catch {
+      /* aunque falle el servidor, limpiamos la vista local */
+    }
+    setItems([])
+    setNoLeidas(0)
+  }, [])
 
   useEffect(() => {
     if (!activo) {
@@ -103,5 +115,5 @@ export function useNotificacionesAdmin({ activo, onNueva }: UseNotificacionesArg
     }
   }, [activo, generacion])
 
-  return { items, estado, errorMensaje, noLeidas, marcarLeidas, reintentar }
+  return { items, estado, errorMensaje, noLeidas, marcarLeidas, reintentar, limpiar }
 }

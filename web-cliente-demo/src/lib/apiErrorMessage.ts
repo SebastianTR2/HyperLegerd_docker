@@ -9,6 +9,12 @@ export function describeApiError(e: unknown): string {
   if (e instanceof ApiHttpError) {
     if (e.status === 401 || e.status === 403) {
       console.warn('[API acceso]', e.status, e.payload?.codigo ?? '', e.payload?.mensaje ?? e.message)
+      if (e.payload?.codigo === 'TENANT_NO_AUTORIZADO') {
+        return 'Esta ruta no aplica para tu organización. Cambia de vista o usa el endpoint del tenant actual.'
+      }
+      if (e.payload?.codigo === 'ACCESO_DENEGADO') {
+        return 'Tu rol no tiene permiso para esta operación.'
+      }
       return 'Credencial inválida. Verifica la clave en la sección Credenciales.'
     }
     if (e.status === 404 && e.payload?.codigo === 'ERROR_VALIDACION_OPENAPI') {

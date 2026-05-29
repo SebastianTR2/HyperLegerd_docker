@@ -85,6 +85,7 @@ func SetupRoutes(router *gin.Engine) {
 	// (mutaciones hechas por integradores u otros roles).
 	router.GET("/admin/notificaciones/stream", append(authSoloAdmin, handlers.StreamNotificacionesAdmin)...)
 	router.GET("/admin/notificaciones", append(authSoloAdmin, handlers.HistorialNotificacionesAdmin)...)
+	router.DELETE("/admin/notificaciones", append(authSoloAdmin, handlers.PurgarNotificacionesAdmin)...)
 
 	// Auditoría del puente (bitácora en memoria + vista combinada con eventos de cadena)
 	router.GET("/auditoria/http", append(authCualquierRol, handlers.ListarAuditoriaHTTP)...)

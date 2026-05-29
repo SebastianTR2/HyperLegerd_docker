@@ -49,16 +49,16 @@ export function AppLayout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F8F6F2]">
-      <aside className="portal-sidebar hidden w-64 shrink-0 flex-col border-r border-[#E8E1D8] bg-white shadow-[4px_0_24px_rgba(31,41,55,0.04)] lg:flex">
-        <div className="border-b border-[#E8E1D8]/80 px-5 py-5">
+    <div className="flex min-h-screen bg-canvas">
+      <aside className="portal-sidebar hidden w-64 shrink-0 flex-col bg-sidebar text-white shadow-card-md lg:flex">
+        <div className="border-b border-white/10 px-5 py-5">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFF1E6] text-[#D97706]">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-white/10 text-white">
               <IconChain className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-[#6B7280]">CampusChain</p>
-              <h1 className="text-base font-bold leading-tight tracking-tight text-[#1F2937]">Gestión de Clientes</h1>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-white/60">CampusChain</p>
+              <h1 className="text-base font-bold leading-tight tracking-tight text-white">Gestión de Clientes</h1>
             </div>
           </div>
         </div>
@@ -70,32 +70,32 @@ export function AppLayout() {
               end={item.end}
               className={({ isActive }) =>
                 [
-                  'flex items-center gap-3 rounded-xl px-3 py-3 text-base font-medium leading-snug transition-all duration-150',
+                  'flex items-center gap-3 rounded-md px-3 py-3 text-base font-medium leading-snug transition-colors',
                   isActive
-                    ? 'bg-[#FFF1E6] text-[#D97706] shadow-sm ring-1 ring-[#D97706]/15'
-                    : 'text-[#374151] hover:bg-[#F5F2EC] hover:text-[#1F2937]',
+                    ? 'bg-sidebar-active text-white'
+                    : 'text-white/75 hover:bg-sidebar-hover hover:text-white',
                 ].join(' ')
               }
             >
               {({ isActive }) => (
                 <>
-                  <span className={['shrink-0 opacity-90', isActive ? 'text-[#D97706]' : ''].join(' ')}>{item.icon}</span>
+                  <span className={['shrink-0', isActive ? 'text-white' : 'text-white/70'].join(' ')}>{item.icon}</span>
                   {item.label}
                 </>
               )}
             </NavLink>
           ))}
         </nav>
-        <div className="mt-auto border-t border-[#E8E1D8]/60 p-4">
-          <div className="rounded-xl border border-[#E8E1D8] bg-[#F5F2EC]/60 px-3 py-3">
-            <p className="text-xs font-medium text-[#1F2937]">¿Necesitas ayuda?</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-[#6B7280]">Consulta al equipo de tu organización.</p>
+        <div className="mt-auto border-t border-white/10 p-4">
+          <div className="rounded-md border border-white/10 bg-white/5 px-3 py-3">
+            <p className="text-xs font-medium text-white">¿Necesitas ayuda?</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-white/60">Consulta al equipo de tu organización.</p>
           </div>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="portal-topnav flex gap-1 overflow-x-auto border-b border-[#E8E1D8] bg-white px-2 py-2 shadow-sm lg:hidden">
+        <div className="portal-topnav flex gap-1 overflow-x-auto border-b border-line bg-surface px-2 py-2 shadow-sm lg:hidden">
           {navVisible.map((item) => (
             <NavLink
               key={item.to}
@@ -103,8 +103,8 @@ export function AppLayout() {
               end={item.end}
               className={({ isActive }) =>
                 [
-                  'flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold',
-                  isActive ? 'bg-[#FFF1E6] text-[#D97706]' : 'text-[#374151] hover:bg-[#F5F2EC]',
+                  'flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold',
+                  isActive ? 'bg-accent-soft text-accent' : 'text-ink-secondary hover:bg-gray-50',
                 ].join(' ')
               }
             >
@@ -113,22 +113,22 @@ export function AppLayout() {
             </NavLink>
           ))}
         </div>
-        <header className="shrink-0 border-b border-[#E8E1D8] bg-white px-4 py-4 shadow-sm sm:px-6 sm:py-5">
+        <header className="shrink-0 border-b border-line bg-surface px-4 py-4 shadow-sm sm:px-6 sm:py-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-xl font-bold tracking-tight text-[#1F2937]">{title}</h2>
-              {subtitle ? <p className="mt-1 text-sm leading-relaxed text-[#6B7280]">{subtitle}</p> : null}
+              <h2 className="text-xl font-bold tracking-tight text-ink">{title}</h2>
+              {subtitle ? <p className="mt-1 text-sm leading-relaxed text-muted">{subtitle}</p> : null}
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
               {user ? (
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#E8E1D8] bg-[#F5F2EC]/50 px-3 py-2 text-sm">
-                  <span className="font-medium text-[#1F2937]">
+                <div className="flex flex-wrap items-center gap-2 rounded-md border border-line bg-gray-50 px-3 py-2 text-sm">
+                  <span className="font-medium text-ink">
                     {user.nombreCompleto} · {rolEtiqueta(user.rol)}
                   </span>
                   <button
                     type="button"
                     onClick={() => void onLogout()}
-                    className="rounded-lg border border-[#E8E1D8] bg-white px-2.5 py-1 text-xs font-semibold text-[#374151] hover:bg-[#FFF1E6] hover:text-[#D97706]"
+                    className="rounded-md border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-ink-secondary hover:bg-gray-100 hover:text-accent"
                   >
                     Cerrar sesión
                   </button>
@@ -139,10 +139,10 @@ export function AppLayout() {
           </div>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto bg-[#F8F6F2] p-4 sm:p-6 lg:p-8">
+        <main className="min-h-0 flex-1 overflow-y-auto bg-canvas p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
-        <footer className="shrink-0 border-t border-[#E8E1D8]/70 bg-white px-4 py-3 text-center text-xs text-[#6B7280]">
+        <footer className="shrink-0 border-t border-line bg-surface px-4 py-3 text-center text-xs text-muted">
           Gracias por confiar en CampusChain · Seguimos mejorando tu experiencia
         </footer>
       </div>
@@ -164,23 +164,20 @@ function HeaderSearch() {
   return (
     <form
       onSubmit={submit}
-      className="flex w-full max-w-lg flex-col gap-2 rounded-2xl border border-[#E8E1D8] bg-[#F5F2EC]/50 p-1.5 shadow-inner sm:flex-row sm:items-stretch lg:max-w-md"
+      className="flex w-full max-w-lg flex-col gap-2 rounded-md border border-line bg-gray-50 p-1.5 sm:flex-row sm:items-stretch lg:max-w-md"
     >
       <div className="relative min-w-0 flex-1">
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">
           <IconSearch className="h-4 w-4" />
         </span>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Buscar por código, nombre o documento…"
-          className="portal-field h-10 w-full rounded-xl border-0 bg-transparent pl-10 pr-3 text-sm text-[#1F2937] outline-none placeholder:text-[#6B7280]/80"
+          className="portal-field h-10 w-full rounded-md border-0 bg-transparent pl-10 pr-3 text-sm text-ink outline-none placeholder:text-muted/80"
         />
       </div>
-      <button
-        type="submit"
-        className="h-10 shrink-0 rounded-xl bg-[#D97706] px-5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#C96E0A] hover:shadow active:scale-[0.98] sm:h-auto sm:self-stretch"
-      >
+      <button type="submit" className="admin-btn-primary h-10 shrink-0 px-5 sm:h-auto sm:self-stretch">
         Buscar
       </button>
     </form>

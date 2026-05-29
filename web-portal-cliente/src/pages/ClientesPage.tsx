@@ -60,28 +60,28 @@ export default function ClientesPage() {
 
       <Card title="Listado de clientes" subtitle="Consulta y gestión de registros.">
         {readOnly ? (
-          <p className="mb-3 rounded-xl border border-[#E8E1D8] bg-white/70 px-3 py-2 text-xs text-[#6B7280]">
+          <p className="mb-3 rounded-xl border border-line bg-white/70 px-3 py-2 text-xs text-muted">
             Su perfil solo permite consultar información.
           </p>
         ) : null}
         {loading ? (
-          <p className="text-sm text-[#6B7280]">Cargando…</p>
+          <p className="text-sm text-muted">Cargando…</p>
         ) : accessBlocked ? (
-          <div className="rounded-xl border border-dashed border-[#E8E1D8] bg-white/60 px-4 py-8 text-center text-sm text-[#6B7280]">
+          <div className="rounded-xl border border-dashed border-line bg-white/60 px-4 py-8 text-center text-sm text-muted">
             No se pudieron cargar los datos. Intente más tarde o contacte al administrador.
           </div>
         ) : error ? (
-          <p className="text-sm text-red-800">{error}</p>
+          <p className="text-sm text-danger-ink">{error}</p>
         ) : filtrados.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[#E8E1D8] bg-white/60 px-4 py-8 text-center">
-            <p className="text-sm text-[#1F2937]">No hay clientes registrados todavía.</p>
-            <p className="mt-2 text-xs text-[#6B7280]">Cuando registre clientes, aparecerán en esta tabla.</p>
+          <div className="rounded-xl border border-dashed border-line bg-white/60 px-4 py-8 text-center">
+            <p className="text-sm text-ink">No hay clientes registrados todavía.</p>
+            <p className="mt-2 text-xs text-muted">Cuando registre clientes, aparecerán en esta tabla.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#E8E1D8] text-xs text-[#6B7280]">
+                <tr className="border-b border-line text-xs text-muted">
                   <th className="pb-3 pr-3 font-medium">Código</th>
                   <th className="pb-3 pr-3 font-medium">Documento</th>
                   <th className="pb-3 pr-3 font-medium">Nombre</th>
@@ -92,10 +92,10 @@ export default function ClientesPage() {
               </thead>
               <tbody>
                 {filtrados.map((r) => (
-                  <tr key={r.codigo} className="border-b border-[#E8E1D8]/70 hover:bg-[#F5F2EC]/60">
-                    <td className="py-3 pr-3 font-mono text-xs text-[#6B7280]">{r.codigo}</td>
-                    <td className="py-3 pr-3 text-[#6B7280]">{r.documentoEtiqueta}</td>
-                    <td className="py-3 pr-3 text-[#1F2937]">{r.nombre}</td>
+                  <tr key={r.codigo} className="border-b border-line/70 hover:bg-gray-50/60">
+                    <td className="py-3 pr-3 font-mono text-xs text-muted">{r.codigo}</td>
+                    <td className="py-3 pr-3 text-muted">{r.documentoEtiqueta}</td>
+                    <td className="py-3 pr-3 text-ink">{r.nombre}</td>
                     <td className="py-3 pr-3">
                       <Badge
                         tone={
@@ -109,7 +109,7 @@ export default function ClientesPage() {
                         {r.estadoEtiqueta}
                       </Badge>
                     </td>
-                    <td className="py-3 pr-3 text-xs text-[#6B7280]">{formatDisplayDate(r.fechaRegistro)}</td>
+                    <td className="py-3 pr-3 text-xs text-muted">{formatDisplayDate(r.fechaRegistro)}</td>
                     <td className="py-3">
                       <div className="flex flex-wrap gap-2">
                         <Link to={`/clientes/${encodeURIComponent(r.codigo)}`}>

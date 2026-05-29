@@ -13,10 +13,10 @@ export function ToastStack() {
           key={t.id}
           type="button"
           className={[
-            'pointer-events-auto w-full rounded-xl border px-4 py-3 text-left text-sm shadow-card backdrop-blur-md transition-transform',
-            t.variant === 'success' && 'border-success/30 bg-success/15 text-success',
-            t.variant === 'error' && 'border-danger/35 bg-danger/15 text-danger/95',
-            t.variant === 'info' && 'border-line bg-elevated/95 text-slate-200',
+            'pointer-events-auto w-full rounded-md border px-4 py-3 text-left text-sm shadow-card-md transition-transform',
+            t.variant === 'success' && 'border-success/30 bg-success-soft text-success-ink',
+            t.variant === 'error' && 'border-danger/30 bg-danger-soft text-danger-ink',
+            t.variant === 'info' && 'border-line bg-surface text-ink-secondary',
           ]
             .filter(Boolean)
             .join(' ')}

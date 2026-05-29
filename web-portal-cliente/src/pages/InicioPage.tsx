@@ -57,18 +57,18 @@ export default function InicioPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <Card title="Resumen" subtitle="Clientes disponibles en el listado.">
               {loading ? (
-                <p className="text-sm text-[#6B7280]">Cargando…</p>
+                <p className="text-sm text-muted">Cargando…</p>
               ) : error && !accessBlocked ? (
-                <p className="text-sm text-red-800">{error}</p>
+                <p className="text-sm text-danger-ink">{error}</p>
               ) : accessBlocked ? (
                 <div className="space-y-1">
-                  <p className="text-2xl font-semibold text-[#6B7280]">—</p>
-                  <p className="text-xs text-[#6B7280]">No se pudieron obtener los datos en este momento.</p>
+                  <p className="text-2xl font-semibold text-muted">—</p>
+                  <p className="text-xs text-muted">No se pudieron obtener los datos en este momento.</p>
                 </div>
               ) : (
                 <>
-                  <p className="text-2xl font-semibold text-[#1F2937]">{total}</p>
-                  <p className="mt-1 text-xs text-[#6B7280]">Clientes registrados en el sistema.</p>
+                  <p className="text-2xl font-semibold text-ink">{total}</p>
+                  <p className="mt-1 text-xs text-muted">Clientes registrados en el sistema.</p>
                 </>
               )}
             </Card>
@@ -90,24 +90,24 @@ export default function InicioPage() {
 
           <Card title="Clientes recientes" subtitle="Últimos registros visibles en el listado.">
             {loading ? (
-              <p className="text-sm text-[#6B7280]">Cargando…</p>
+              <p className="text-sm text-muted">Cargando…</p>
             ) : accessBlocked ? (
-              <div className="rounded-xl border border-dashed border-[#E8E1D8] bg-white/60 px-4 py-8 text-center">
-                <p className="text-sm text-[#1F2937]">No hay datos para mostrar.</p>
-                <p className="mt-2 text-xs text-[#6B7280]">Cuando el acceso al servicio se restablezca, podrá ver el listado aquí.</p>
+              <div className="rounded-xl border border-dashed border-line bg-white/60 px-4 py-8 text-center">
+                <p className="text-sm text-ink">No hay datos para mostrar.</p>
+                <p className="mt-2 text-xs text-muted">Cuando el acceso al servicio se restablezca, podrá ver el listado aquí.</p>
               </div>
             ) : error ? (
-              <p className="text-sm text-red-800">{error}</p>
+              <p className="text-sm text-danger-ink">{error}</p>
             ) : recientes.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-[#E8E1D8] bg-white/60 px-4 py-8 text-center">
-                <p className="text-sm text-[#1F2937]">No hay clientes registrados todavía.</p>
-                <p className="mt-2 text-xs text-[#6B7280]">Cuando registres clientes, aparecerán aquí.</p>
+              <div className="rounded-xl border border-dashed border-line bg-white/60 px-4 py-8 text-center">
+                <p className="text-sm text-ink">No hay clientes registrados todavía.</p>
+                <p className="mt-2 text-xs text-muted">Cuando registres clientes, aparecerán aquí.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[520px] text-left text-sm">
                   <thead>
-                    <tr className="border-b border-[#E8E1D8] text-xs text-[#6B7280]">
+                    <tr className="border-b border-line text-xs text-muted">
                       <th className="pb-2 pr-3 font-medium">Código</th>
                       <th className="pb-2 pr-3 font-medium">Documento</th>
                       <th className="pb-2 pr-3 font-medium">Nombre</th>
@@ -117,14 +117,14 @@ export default function InicioPage() {
                   </thead>
                   <tbody>
                     {recientes.map((r) => (
-                      <tr key={r.codigo} className="border-b border-[#E8E1D8]/80 hover:bg-[#F5F2EC]/70">
-                        <td className="py-2 pr-3 font-mono text-xs text-[#6B7280]">
-                          <Link className="portal-link text-[#D97706] hover:underline" to={`/clientes/${encodeURIComponent(r.codigo)}`}>
+                      <tr key={r.codigo} className="border-b border-line/80 hover:bg-gray-50/70">
+                        <td className="py-2 pr-3 font-mono text-xs text-muted">
+                          <Link className="portal-link text-accent hover:underline" to={`/clientes/${encodeURIComponent(r.codigo)}`}>
                             {r.codigo}
                           </Link>
                         </td>
-                        <td className="py-2 pr-3 text-[#6B7280]">{r.documentoEtiqueta}</td>
-                        <td className="py-2 pr-3 text-[#1F2937]">{r.nombre}</td>
+                        <td className="py-2 pr-3 text-muted">{r.documentoEtiqueta}</td>
+                        <td className="py-2 pr-3 text-ink">{r.nombre}</td>
                         <td className="py-2 pr-3">
                           <Badge
                             tone={
@@ -138,7 +138,7 @@ export default function InicioPage() {
                             {r.estadoEtiqueta}
                           </Badge>
                         </td>
-                        <td className="py-2 text-xs text-[#6B7280]">{formatDisplayDate(r.fechaRegistro)}</td>
+                        <td className="py-2 text-xs text-muted">{formatDisplayDate(r.fechaRegistro)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -151,7 +151,7 @@ export default function InicioPage() {
         <div className="flex flex-col gap-6">
           <Card title="Mensajes recientes" subtitle="Avisos de esta sesión.">
             {messages.length === 0 ? (
-              <p className="text-sm text-[#6B7280]">No hay mensajes en esta sesión.</p>
+              <p className="text-sm text-muted">No hay mensajes en esta sesión.</p>
             ) : (
               <ul className="space-y-2">
                 {messages.slice(0, 6).map((m) => {
@@ -162,12 +162,12 @@ export default function InicioPage() {
                       className={[
                         'rounded-xl border px-3 py-2.5 text-xs',
                         m.variant === 'success'
-                          ? 'border-green-200 bg-green-50 text-green-800'
+                          ? 'border-success/30 bg-success-soft text-success-ink'
                           : acceso
-                            ? 'border-amber-200 bg-amber-50 text-amber-900'
+                            ? 'border-warning/35 bg-warning-soft text-warning-ink'
                             : m.variant === 'error'
-                              ? 'border-red-200 bg-red-50 text-red-800'
-                              : 'border-[#E8E1D8] bg-[#F5F2EC] text-[#1F2937]',
+                              ? 'border-danger/30 bg-danger-soft text-danger-ink'
+                              : 'border-line bg-gray-50 text-ink',
                       ].join(' ')}
                     >
                       <p className="font-medium">{m.titulo}</p>
@@ -180,23 +180,23 @@ export default function InicioPage() {
           </Card>
           <Card title="Actividad reciente" subtitle="Movimientos registrados en esta sesión.">
             {activities.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-[#E8E1D8] bg-white/60 px-4 py-6 text-center">
-                <p className="text-sm text-[#6B7280]">No hay actividad reciente en esta sesión.</p>
+              <div className="rounded-xl border border-dashed border-line bg-white/60 px-4 py-6 text-center">
+                <p className="text-sm text-muted">No hay actividad reciente en esta sesión.</p>
               </div>
             ) : (
               <ul className="space-y-2">
                 {activities.slice(0, 8).map((a) => (
-                  <li key={a.id} className="flex gap-2 text-sm leading-snug text-[#6B7280]">
+                  <li key={a.id} className="flex gap-2 text-sm leading-snug text-muted">
                     <span
                       className={
                         a.variant === 'ok'
-                          ? 'mt-1 h-2 w-2 shrink-0 rounded-full bg-green-700'
+                          ? 'mt-1 h-2 w-2 shrink-0 rounded-full bg-success'
                           : a.variant === 'err'
-                            ? 'mt-1 h-2 w-2 shrink-0 rounded-full bg-[#C75C5C]'
-                            : 'mt-1 h-2 w-2 shrink-0 rounded-full bg-[#9CA3AF]'
+                            ? 'mt-1 h-2 w-2 shrink-0 rounded-full bg-danger'
+                            : 'mt-1 h-2 w-2 shrink-0 rounded-full bg-gray-400'
                       }
                     />
-                    <span className="text-[#6B7280]">{a.texto}</span>
+                    <span className="text-muted">{a.texto}</span>
                   </li>
                 ))}
               </ul>

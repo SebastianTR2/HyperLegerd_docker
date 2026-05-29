@@ -95,18 +95,18 @@ export default function EditarClientePage() {
   }
 
   if (!clienteId) {
-    return <p className="text-sm text-[#6B7280]">Código de cliente no válido.</p>
+    return <p className="text-sm text-muted">Código de cliente no válido.</p>
   }
 
   if (loading) {
-    return <p className="text-sm text-[#6B7280]">Cargando…</p>
+    return <p className="text-sm text-muted">Cargando…</p>
   }
 
   if (accessBlocked) {
     return (
       <div className="mx-auto max-w-lg space-y-4">
         <AccesoServicioBloqueado />
-        <Link className="text-sm text-[#D97706] hover:underline" to="/clientes">
+        <Link className="text-sm text-accent hover:underline" to="/clientes">
           Volver al listado
         </Link>
       </div>
@@ -117,8 +117,8 @@ export default function EditarClientePage() {
     return (
       <div className="mx-auto max-w-lg">
         <Card title="Editar cliente">
-          <p className="text-sm text-[#6B7280]">No se encontró el cliente.</p>
-          <Link className="mt-4 inline-block text-sm text-[#D97706] hover:underline" to="/clientes">
+          <p className="text-sm text-muted">No se encontró el cliente.</p>
+          <Link className="mt-4 inline-block text-sm text-accent hover:underline" to="/clientes">
             Volver
           </Link>
         </Card>
@@ -130,7 +130,7 @@ export default function EditarClientePage() {
     return (
       <div className="mx-auto max-w-lg">
         <Card title="Editar cliente">
-          <p className="text-sm text-[#6B7280]">Su perfil no permite editar registros.</p>
+          <p className="text-sm text-muted">Su perfil no permite editar registros.</p>
         </Card>
       </div>
     )
@@ -140,10 +140,10 @@ export default function EditarClientePage() {
     return (
       <div className="mx-auto max-w-2xl space-y-4">
         <Card title="Editar cliente">
-          <p className="text-sm text-[#6B7280]">
+          <p className="text-sm text-muted">
             Este cliente fue dado de baja y no admite modificaciones. Puede consultar la ficha desde el listado.
           </p>
-          <Link className="mt-4 inline-block text-sm text-[#D97706] hover:underline" to={`/clientes/${encodeURIComponent(clienteId)}`}>
+          <Link className="mt-4 inline-block text-sm text-accent hover:underline" to={`/clientes/${encodeURIComponent(clienteId)}`}>
             Ver ficha
           </Link>
         </Card>
@@ -155,7 +155,7 @@ export default function EditarClientePage() {
     <div className="mx-auto max-w-2xl">
       <Card title="Editar cliente" subtitle="El código y la fecha de alta no se modifican.">
         {serverError ? (
-          <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <p className="mb-4 rounded-lg border border-warning/35 bg-warning-soft px-3 py-2 text-sm text-warning-ink">
             {serverError}
           </p>
         ) : null}
@@ -214,10 +214,10 @@ export default function EditarClientePage() {
           </Field>
           {auditoria ? (
             <Accordion title="Información de auditoría">
-              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-[#6B7280]">{auditoria}</pre>
+              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-muted">{auditoria}</pre>
             </Accordion>
           ) : null}
-          <div className="flex flex-wrap justify-end gap-2 border-t border-[#E8E1D8] pt-4">
+          <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">
             <Link to={`/clientes/${encodeURIComponent(clienteId)}`}>
               <Button variant="secondary" type="button">
                 Cancelar

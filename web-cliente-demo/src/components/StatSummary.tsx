@@ -74,12 +74,12 @@ export function StatSummary({
   return (
     <div className={`grid shrink-0 gap-3 sm:grid-cols-2 ${showTokenCard ? 'xl:grid-cols-5' : 'xl:grid-cols-4'}`}>
       {cardsBase.map((c) => (
-        <div key={c.label} className="rounded-2xl border border-line bg-elevated/90 p-4 shadow-card">
+        <div key={c.label} className="admin-card p-4">
           <p className="text-xs font-medium text-muted">{c.label}</p>
           <p
             className={[
               'mt-2 text-2xl font-semibold tracking-tight',
-              c.highlight ? 'text-success' : 'text-slate-100',
+              c.highlight ? 'text-success' : 'text-ink',
             ].join(' ')}
           >
             {c.value}
@@ -90,7 +90,7 @@ export function StatSummary({
               <span
                 className={[
                   'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium',
-                  c.trendUp ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger',
+                  c.trendUp ? 'bg-success-soft text-success-ink' : 'bg-danger-soft text-danger-ink',
                 ].join(' ')}
               >
                 {c.trend}

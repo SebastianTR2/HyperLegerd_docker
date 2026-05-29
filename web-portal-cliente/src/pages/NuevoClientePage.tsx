@@ -66,8 +66,8 @@ export default function NuevoClientePage() {
     return (
       <div className="mx-auto max-w-2xl">
         <Card title="Nuevo cliente">
-          <p className="text-sm text-[#6B7280]">Su perfil no permite registrar clientes.</p>
-          <p className="mt-3 text-sm text-[#6B7280]">
+          <p className="text-sm text-muted">Su perfil no permite registrar clientes.</p>
+          <p className="mt-3 text-sm text-muted">
             Si necesita permisos de registro, solicítelos al administrador del sistema.
           </p>
         </Card>
@@ -102,8 +102,8 @@ export default function NuevoClientePage() {
                 className={[
                   'mb-4 rounded-xl border px-4 py-3 text-sm',
                   serverError === MENSAJE_ACCESO_SERVICIO
-                    ? 'border-amber-200 bg-amber-50 text-amber-900'
-                    : 'border-[#E8E1D8] bg-white/90 text-[#1F2937]',
+                    ? 'border-warning/35 bg-warning-soft text-warning-ink'
+                    : 'border-line bg-white/90 text-ink',
                 ].join(' ')}
               >
                 {serverError}
@@ -171,7 +171,7 @@ export default function NuevoClientePage() {
           <Field label="Notas" error={errors.notas}>
             <TextArea rows={3} value={form.notas} onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))} />
           </Field>
-          <div className="flex justify-end border-t border-[#E8E1D8] pt-4">
+          <div className="flex justify-end border-t border-line pt-4">
             <Button type="submit" loading={loading}>
               Guardar cliente
             </Button>

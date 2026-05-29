@@ -8,7 +8,7 @@ export function DashboardLayout() {
   const [mobileNav, setMobileNav] = useState(false)
 
   return (
-    <div className="flex h-[100dvh] max-h-[100dvh] overflow-hidden bg-canvas">
+    <div className="flex h-[100dvh] max-h-[100dvh] overflow-hidden bg-canvas text-ink">
       <Sidebar mobileOpen={mobileNav} onCloseMobile={() => setMobileNav(false)} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden lg:pl-0">
         <TopBar onMenuClick={() => setMobileNav(true)} />

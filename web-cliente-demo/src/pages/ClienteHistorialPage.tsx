@@ -10,7 +10,7 @@ import LoteProcesoPanel, { extraerPayloadLote } from '../components/LoteProcesoP
 import type { HistorialFilaVista, AccionLineaTiempo } from '../services/apiHistorialCliente'
 
 const btn =
-  'inline-flex items-center justify-center rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-slate-100 shadow-sm transition-colors hover:bg-accent-hover disabled:opacity-50'
+  'admin-btn-primary shadow-sm transition-colors hover:bg-accent-hover disabled:opacity-50'
 
 export default function ClienteHistorialPage() {
   const { tenant } = useSettings()
@@ -91,7 +91,7 @@ export default function ClienteHistorialPage() {
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-slate-100">Historial en cadena</h1>
+          <h1 className="text-lg font-semibold text-ink">Historial en cadena</h1>
           <p className="mt-1 text-sm text-muted">
             Origen:{' '}
             <code className="rounded bg-surface px-1 font-mono text-xs">
@@ -106,11 +106,11 @@ export default function ClienteHistorialPage() {
           <Link
             to="/consultas"
             state={{ clienteId }}
-            className="inline-flex items-center justify-center rounded-xl border border-line bg-surface/60 px-4 py-2.5 text-sm text-slate-200 hover:bg-elevated"
+            className="inline-flex items-center justify-center rounded-md border border-line bg-gray-50 px-4 py-2.5 text-sm text-ink-secondary hover:bg-gray-100"
           >
             Ver detalle
           </Link>
-          <Link to="/clientes-registrados" className="inline-flex items-center justify-center rounded-xl border border-line px-4 py-2.5 text-sm text-muted hover:text-slate-200">
+          <Link to="/clientes-registrados" className="inline-flex items-center justify-center rounded-xl border border-line px-4 py-2.5 text-sm text-muted hover:text-ink-secondary">
             Listado
           </Link>
         </div>
@@ -119,7 +119,7 @@ export default function ClienteHistorialPage() {
       {error ? <p className="text-sm text-danger/90">{error}</p> : null}
 
       {!loading && timeline.length > 0 && (
-        <div className="rounded-2xl border border-line bg-surface/30 p-5 shadow-sm">
+        <div className="rounded-2xl border border-line bg-gray-50 p-5 shadow-sm">
           <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted">Auditoría de Negocio (Línea de Tiempo)</h2>
           <div className="flex flex-wrap gap-4">
             {timeline.map((acc, i) => (
@@ -140,7 +140,7 @@ export default function ClienteHistorialPage() {
                   {acc.tipo === 'creado' ? '★' : acc.tipo === 'baja' ? '✖' : '✎'}
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-100">
+                  <p className="text-sm font-bold text-ink">
                     {rows[i]?.cliente?.clienteId} - {rows[i]?.cliente?.nombre}
                   </p>
                   <div className="flex items-center gap-2">
@@ -161,9 +161,9 @@ export default function ClienteHistorialPage() {
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-line bg-elevated/90 shadow-card">
+      <div className="min-h-0 flex-1 overflow-auto admin-card shadow-card">
         <table className="w-full text-left text-sm">
-          <thead className="sticky top-0 z-10 border-b border-line bg-surface/95 text-xs uppercase text-muted backdrop-blur-sm">
+          <thead className="sticky top-0 z-10 border-b border-line bg-gray-50 text-xs uppercase text-muted backdrop-blur-sm">
             <tr>
               <th className="px-4 py-2 font-medium">txId</th>
               <th className="px-4 py-2 font-medium">Fecha</th>
@@ -182,15 +182,15 @@ export default function ClienteHistorialPage() {
             {rows.map((r, i) => (
               <tr 
                 key={`${r.txId}-${r.timestamp}`} 
-                className={`cursor-pointer transition-colors ${selectedIdx === i ? 'bg-accent/10' : 'hover:bg-surface/40'}`}
+                className={`cursor-pointer transition-colors ${selectedIdx === i ? 'bg-accent/10' : 'hover:bg-gray-50'}`}
                 onClick={() => setSelectedIdx(selectedIdx === i ? null : i)}
               >
-                <td className="px-4 py-2 font-mono text-xs text-slate-300">{r.txId.slice(0, 8)}...</td>
+                <td className="px-4 py-2 font-mono text-xs text-ink-secondary">{r.txId.slice(0, 8)}...</td>
                 <td className="whitespace-nowrap px-4 py-2 text-xs text-muted">{formatDemoDateTime(r.timestamp)}</td>
                 <td className="px-4 py-2 text-xs">
-                  {r.isDelete ? <span className="text-rose-300">Baja</span> : <span className="text-slate-300">Cambio</span>}
+                  {r.isDelete ? <span className="text-rose-300">Baja</span> : <span className="text-ink-secondary">Cambio</span>}
                 </td>
-                <td className="max-w-md px-4 py-2 text-slate-200">
+                <td className="max-w-md px-4 py-2 text-ink-secondary">
                   <div className="flex items-center justify-between">
                     <span>{r.resumen}</span>
                     <span className="text-[10px] text-accent uppercase font-semibold">{selectedIdx === i ? 'Cerrar' : 'Ver cambios'}</span>
@@ -204,13 +204,13 @@ export default function ClienteHistorialPage() {
 
       {/* Panel de Comparación (Tipo GitHub Mejorado) */}
       {selectedIdx !== null && rows[selectedIdx] && (
-        <div className="rounded-2xl border border-accent/30 bg-surface/40 p-6 shadow-2xl animate-in fade-in slide-in-from-bottom-4">
+        <div className="rounded-2xl border border-accent/30 bg-gray-50 p-6 shadow-2xl animate-in fade-in slide-in-from-bottom-4">
           <div className="mb-4 flex items-center justify-between border-b border-line pb-4">
             <div>
-              <h3 className="text-sm font-semibold text-slate-100">Detalle de la transacción</h3>
+              <h3 className="text-sm font-semibold text-ink">Detalle de la transacción</h3>
               <p className="text-[10px] text-muted font-mono">{rows[selectedIdx].txId}</p>
             </div>
-            <button onClick={() => setSelectedIdx(null)} className="rounded-lg bg-surface/60 px-3 py-1.5 text-xs text-slate-200 hover:bg-elevated">Cerrar</button>
+            <button onClick={() => setSelectedIdx(null)} className="rounded-md bg-gray-50 px-3 py-1.5 text-xs text-ink-secondary hover:bg-gray-100">Cerrar</button>
           </div>
 
           {isAgricultura && lotePayloads[selectedIdx] ? (
@@ -238,12 +238,12 @@ export default function ClienteHistorialPage() {
                   <tbody className="divide-y divide-line">
                     {clienteFilasLegibles(rows[selectedIdx].cliente).map(({ key, value }) => (
                       <tr key={key} className="group">
-                        <td className="px-4 py-2.5 font-medium text-slate-400">{key}</td>
+                        <td className="px-4 py-2.5 font-medium text-muted">{key}</td>
                         <td className="px-4 py-2.5">
                           <span
                             className={`rounded px-1.5 py-0.5 ${
                               key === 'informacionAuditoria'
-                                ? 'bg-surface/60 text-[10px] text-muted whitespace-pre-wrap'
+                                ? 'bg-gray-50 text-[10px] text-muted whitespace-pre-wrap'
                                 : 'bg-emerald-500/10 text-emerald-300'
                             }`}
                           >
@@ -260,7 +260,7 @@ export default function ClienteHistorialPage() {
             <div className="space-y-4">
               <div className="overflow-hidden rounded-xl border border-line bg-surface/20">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-surface/40 text-[10px] uppercase text-muted">
+                  <thead className="bg-gray-50 text-[10px] uppercase text-muted">
                     <tr>
                       <th className="px-4 py-2 font-semibold">Campo</th>
                       <th className="px-4 py-2 font-semibold">Estado Actual</th>
@@ -274,7 +274,7 @@ export default function ClienteHistorialPage() {
 
                       return (
                         <tr key={key} className={hasChanged ? 'bg-accent/5' : ''}>
-                          <td className={`px-4 py-2.5 font-medium ${hasChanged ? 'text-accent' : 'text-slate-500'}`}>{key}</td>
+                          <td className={`px-4 py-2.5 font-medium ${hasChanged ? 'text-accent' : 'text-muted'}`}>{key}</td>
                           <td className="px-4 py-2.5">
                             {hasChanged ? (
                               <div className="flex flex-wrap items-center gap-2">
@@ -291,7 +291,7 @@ export default function ClienteHistorialPage() {
                                 className={
                                   key === 'informacionAuditoria'
                                     ? 'text-[10px] text-muted whitespace-pre-wrap'
-                                    : 'text-slate-400'
+                                    : 'text-muted'
                                 }
                               >
                                 {displayClienteField(key, value)}

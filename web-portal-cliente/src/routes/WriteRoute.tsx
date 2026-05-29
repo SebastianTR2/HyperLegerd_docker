@@ -9,11 +9,11 @@ export function WriteRoute() {
     return (
       <div className="mx-auto max-w-lg">
         <Card title="Acceso restringido">
-          <p className="text-sm text-[#374151]">
+          <p className="text-sm text-ink-secondary">
             Su perfil solo permite consultar información. No puede crear, editar ni dar de baja clientes.
           </p>
           <p className="mt-4">
-            <Link to="/clientes" className="text-sm font-medium text-[#D97706] hover:underline">
+            <Link to="/clientes" className="portal-link text-sm font-medium">
               Volver al listado de clientes
             </Link>
           </p>

@@ -42,10 +42,10 @@ export function extraerPayloadLote(datos: unknown): Dict | null {
 
 function colorPrioridad(p: string): string {
   const v = p.toLowerCase()
-  if (v.includes('alta')) return 'bg-rose-500/15 text-rose-300 border-rose-500/30'
-  if (v.includes('media')) return 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-  if (v.includes('baja')) return 'bg-sky-500/15 text-sky-300 border-sky-500/30'
-  return 'bg-slate-500/15 text-slate-300 border-slate-500/30'
+  if (v.includes('alta')) return 'bg-danger-soft text-danger-ink border-danger/30'
+  if (v.includes('media')) return 'bg-warning-soft text-warning-ink border-warning/30'
+  if (v.includes('baja')) return 'bg-accent-soft text-accent border-accent/30'
+  return 'bg-gray-100 text-ink-secondary border-line'
 }
 
 function ResumenItem({ label, value }: { label: string; value: string }) {
@@ -53,7 +53,7 @@ function ResumenItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="text-[10px] uppercase tracking-wider text-muted">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-200">{value}</dd>
+      <dd className="mt-0.5 text-sm text-ink-secondary">{value}</dd>
     </div>
   )
 }
@@ -86,12 +86,12 @@ export default function LoteProcesoPanel({
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
-        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">🌱</span>
-        <h3 className="text-sm font-semibold text-slate-100">{titulo}</h3>
+        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-success-soft text-success">🌱</span>
+        <h3 className="text-sm font-semibold text-ink">{titulo}</h3>
       </div>
 
       {!compacto && (
-        <dl className="grid gap-3 rounded-xl border border-line/60 bg-surface/30 p-4 text-sm sm:grid-cols-3">
+        <dl className="grid gap-3 rounded-xl border border-line/60 bg-gray-50 p-4 text-sm sm:grid-cols-3">
           <ResumenItem label="Cultivo" value={str(payload.cultivo) || '—'} />
           <ResumenItem label="Agricultor" value={str(payload.agricultor)} />
           <ResumenItem label="Estado" value={str(payload.estado) || '—'} />
@@ -108,8 +108,8 @@ export default function LoteProcesoPanel({
 
       {/* Actividades */}
       <div className="overflow-hidden rounded-xl border border-line bg-surface/20">
-        <div className="flex items-center justify-between border-b border-line bg-surface/40 px-4 py-2">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-300">Actividades</h4>
+        <div className="flex items-center justify-between border-b border-line bg-gray-50 px-4 py-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Actividades</h4>
           <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-bold text-accent">
             {actividades.length}
           </span>
@@ -119,7 +119,7 @@ export default function LoteProcesoPanel({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-surface/40 text-[10px] uppercase text-muted">
+              <thead className="bg-gray-50 text-[10px] uppercase text-muted">
                 <tr>
                   <th className="px-3 py-2 font-semibold">Tipo</th>
                   <th className="px-3 py-2 font-semibold">Descripción</th>
@@ -134,13 +134,13 @@ export default function LoteProcesoPanel({
                 {actividades.map((a, i) => {
                   const prioridad = str(a.prioridad)
                   return (
-                    <tr key={str(a.actividadid) || i} className="hover:bg-surface/30">
+                    <tr key={str(a.actividadid) || i} className="hover:bg-gray-50">
                       <td className="px-3 py-2">
                         <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-medium text-emerald-300">
                           {str(a.tipo) || '—'}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-slate-200">{str(a.descripcion) || '—'}</td>
+                      <td className="px-3 py-2 text-ink-secondary">{str(a.descripcion) || '—'}</td>
                       <td className="px-3 py-2">
                         {prioridad ? (
                           <span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${colorPrioridad(prioridad)}`}>
@@ -152,7 +152,7 @@ export default function LoteProcesoPanel({
                       </td>
                       <td className="whitespace-nowrap px-3 py-2 text-muted">{fecha(a.fechainicio)}</td>
                       <td className="whitespace-nowrap px-3 py-2 text-muted">{fecha(a.fechafin)}</td>
-                      <td className="px-3 py-2 text-slate-300">{str(a.usuario) || '—'}</td>
+                      <td className="px-3 py-2 text-ink-secondary">{str(a.usuario) || '—'}</td>
                       <td className="px-3 py-2 text-muted">{str(a.observaciones) || '—'}</td>
                     </tr>
                   )
@@ -165,8 +165,8 @@ export default function LoteProcesoPanel({
 
       {/* Producciones */}
       <div className="overflow-hidden rounded-xl border border-line bg-surface/20">
-        <div className="flex items-center justify-between border-b border-line bg-surface/40 px-4 py-2">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-300">Producciones</h4>
+        <div className="flex items-center justify-between border-b border-line bg-gray-50 px-4 py-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Producciones</h4>
           <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-bold text-accent">
             {producciones.length}
           </span>
@@ -176,7 +176,7 @@ export default function LoteProcesoPanel({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-surface/40 text-[10px] uppercase text-muted">
+              <thead className="bg-gray-50 text-[10px] uppercase text-muted">
                 <tr>
                   <th className="px-3 py-2 font-semibold">Cantidad</th>
                   <th className="px-3 py-2 font-semibold">Unidad</th>
@@ -187,10 +187,10 @@ export default function LoteProcesoPanel({
               </thead>
               <tbody className="divide-y divide-line/60">
                 {producciones.map((p, i) => (
-                  <tr key={str(p.produccionid) || i} className="hover:bg-surface/30">
-                    <td className="px-3 py-2 font-medium text-slate-100">{str(p.cantidad) || '—'}</td>
-                    <td className="px-3 py-2 text-slate-300">{str(p.unidad) || '—'}</td>
-                    <td className="px-3 py-2 text-slate-300">{str(p.destino) || '—'}</td>
+                  <tr key={str(p.produccionid) || i} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 font-medium text-ink">{str(p.cantidad) || '—'}</td>
+                    <td className="px-3 py-2 text-ink-secondary">{str(p.unidad) || '—'}</td>
+                    <td className="px-3 py-2 text-ink-secondary">{str(p.destino) || '—'}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-muted">{fechaCorta(p.fechacosecha)}</td>
                     <td className="px-3 py-2 text-muted">{str(p.observaciones) || '—'}</td>
                   </tr>

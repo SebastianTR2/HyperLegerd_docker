@@ -15,7 +15,7 @@ export function RequiereSesion({ children }: { children: ReactElement }) {
   if (estado === 'verificando') {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-canvas">
-        <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-5 py-3 text-sm text-muted shadow-card">
+        <div className="admin-card flex items-center gap-3 px-5 py-3 text-sm text-muted">
           <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-accent" />
           <span>Validando sesión…</span>
         </div>

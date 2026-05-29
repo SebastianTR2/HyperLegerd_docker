@@ -32,26 +32,26 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
       {mobileOpen ? (
         <button
           type="button"
-          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
           aria-label="Cerrar menú"
           onClick={onCloseMobile}
         />
       ) : null}
       <aside
         className={[
-          'fixed z-40 flex h-full w-64 shrink-0 flex-col border-r border-line bg-surface/95 backdrop-blur-sm transition-transform lg:static lg:translate-x-0',
+          'fixed z-40 flex h-full w-64 shrink-0 flex-col bg-sidebar text-white shadow-card-md transition-transform lg:static lg:translate-x-0',
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
         ].join(' ')}
       >
-        <div className="border-b border-line px-5 py-6">
+        <div className="border-b border-white/10 px-5 py-5">
           <NavLink to="/" end className="block" onClick={onCloseMobile}>
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-elevated shadow-card">
-                <span className="text-lg font-semibold text-accent">C</span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/10">
+                <span className="text-lg font-bold text-white">C</span>
               </div>
               <div>
-                <p className="text-sm font-semibold tracking-tight text-slate-100">CampusChain</p>
-                <p className="text-xs text-muted">Trazabilidad institucional</p>
+                <p className="text-sm font-semibold tracking-tight text-white">CampusChain</p>
+                <p className="text-xs text-white/60">Trazabilidad institucional</p>
               </div>
             </div>
           </NavLink>
@@ -65,32 +65,32 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
               onClick={onCloseMobile}
               className={({ isActive }) =>
                 [
-                  'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
+                  'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors',
                   isActive
-                    ? 'bg-elevated font-medium text-slate-100 shadow-card'
-                    : 'text-muted hover:bg-elevated/60 hover:text-slate-200',
+                    ? 'bg-sidebar-active font-medium text-white'
+                    : 'text-white/75 hover:bg-sidebar-hover hover:text-white',
                 ].join(' ')
               }
             >
               {({ isActive }) => (
                 <>
-                  <it.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-accent' : 'opacity-80'}`} />
+                  <it.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-white' : 'text-white/70'}`} />
                   <span>{it.label}</span>
                 </>
               )}
             </NavLink>
           ))}
         </nav>
-        <div className="border-t border-line p-4">
-          <div className="rounded-xl border border-line bg-elevated/80 p-3 shadow-card">
-            <p className="text-xs font-medium text-muted">Conexión</p>
-            <p className="mt-1 text-sm font-medium text-slate-200">Hyperledger Fabric</p>
+        <div className="border-t border-white/10 p-4">
+          <div className="rounded-md border border-white/10 bg-white/5 p-3">
+            <p className="text-xs font-medium text-white/60">Conexión</p>
+            <p className="mt-1 text-sm font-medium text-white">Hyperledger Fabric</p>
             <div className="mt-2 flex items-center gap-2">
               <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success/40 opacity-75" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success/50 opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
               </span>
-              <span className="text-xs text-muted">Estado vía middleware</span>
+              <span className="text-xs text-white/60">Estado vía middleware</span>
             </div>
           </div>
         </div>

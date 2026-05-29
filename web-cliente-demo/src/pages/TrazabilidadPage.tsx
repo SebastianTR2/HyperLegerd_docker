@@ -51,8 +51,8 @@ export default function TrazabilidadPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col gap-4">
-      <div className="shrink-0 rounded-2xl border border-line bg-elevated/90 p-4 shadow-card sm:p-5">
-        <h2 className="text-sm font-semibold text-slate-100">Trazabilidad de operaciones</h2>
+      <div className="shrink-0 admin-card p-4 shadow-card sm:p-5">
+        <h2 className="text-sm font-semibold text-ink">Trazabilidad de operaciones</h2>
         <p className="mt-1 text-xs text-muted">
           Cada operación muestra su recorrido: captura, validación de rol, envío a API y respuesta (con TXID cuando
           aplica). Puedes copiar txId/txIdMint para validarlo manualmente en Hyperledger Explorer.
@@ -66,8 +66,8 @@ export default function TrazabilidadPage() {
               className={[
                 'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
                 tipo === f.id
-                  ? 'border-accent-soft bg-accent-soft/30 text-slate-100'
-                  : 'border-line bg-surface/50 text-muted hover:border-accent-soft/40 hover:text-slate-200',
+                  ? 'border-accent/30 bg-accent-soft text-accent'
+                  : 'border-line bg-gray-50 text-muted hover:border-accent-soft/40 hover:text-ink-secondary',
               ].join(' ')}
             >
               {f.label}
@@ -78,7 +78,7 @@ export default function TrazabilidadPage() {
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-0.5">
         {list.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-line bg-elevated/40 p-8 text-center text-sm text-muted">
+          <div className="rounded-md border border-dashed border-line bg-gray-50 p-8 text-center text-sm text-muted">
             Aún no hay trazas registradas con este filtro.
           </div>
         ) : null}
@@ -98,10 +98,10 @@ function TraceCard({
   onCopy: (value: string, label: string) => Promise<void>
 }) {
   return (
-    <article className="rounded-2xl border border-line bg-elevated/90 p-4 shadow-card sm:p-5">
+    <article className="admin-card p-4 shadow-card sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-slate-100">{traceTipoLabel(trace.operationType)}</p>
+          <p className="text-sm font-semibold text-ink">{traceTipoLabel(trace.operationType)}</p>
           <p className="mt-1 text-xs text-muted">{trace.message}</p>
         </div>
         <span className={badgeState(trace.state)}>{traceEstadoLabel(trace.state)}</span>
@@ -125,7 +125,7 @@ function TraceCard({
           <li key={s.id} className="flex items-start gap-2 text-xs">
             <span className={stepDot(s.status)}>{idx + 1}</span>
             <div>
-              <p className="font-medium text-slate-200">{s.label}</p>
+              <p className="font-medium text-ink-secondary">{s.label}</p>
               {s.detail ? <p className="text-muted">{s.detail}</p> : null}
             </div>
           </li>
@@ -133,11 +133,11 @@ function TraceCard({
       </ol>
 
       {trace.txId || trace.txIdMint ? (
-        <div className="mt-4 rounded-xl border border-line bg-surface/50 p-3">
+        <div className="mt-4 rounded-xl border border-line bg-gray-50 p-3">
           {trace.txId ? (
             <div className="mb-2">
               <p className="text-[11px] uppercase text-muted">txId</p>
-              <p className="break-all font-mono text-xs text-slate-300">{trace.txId}</p>
+              <p className="break-all font-mono text-xs text-ink-secondary">{trace.txId}</p>
               <button className="mt-1 text-xs text-accent hover:text-accent-hover" onClick={() => void onCopy(trace.txId!, 'txId')}>
                 Copiar TXID
               </button>
@@ -146,7 +146,7 @@ function TraceCard({
           {trace.txIdMint ? (
             <div>
               <p className="text-[11px] uppercase text-muted">txIdMint</p>
-              <p className="break-all font-mono text-xs text-slate-400">{trace.txIdMint}</p>
+              <p className="break-all font-mono text-xs text-muted">{trace.txIdMint}</p>
               <button
                 className="mt-1 text-xs text-accent hover:text-accent-hover"
                 onClick={() => void onCopy(trace.txIdMint!, 'txIdMint')}
@@ -168,7 +168,7 @@ function Meta({ k, v, mono = false }: { k: string; v: string; mono?: boolean }) 
   return (
     <div>
       <dt className="text-[10px] uppercase text-muted">{k}</dt>
-      <dd className={`mt-0.5 text-slate-300 ${mono ? 'font-mono' : ''}`}>{v}</dd>
+      <dd className={`mt-0.5 text-ink-secondary ${mono ? 'font-mono' : ''}`}>{v}</dd>
     </div>
   )
 }
@@ -178,7 +178,7 @@ function badgeState(state: TraceEntry['state']): string {
   if (state === 'exitoso') return `${base} border-success/30 bg-success/15 text-success`
   if (state === 'error') return `${base} border-danger/40 bg-danger/15 text-danger`
   if (state === 'bloqueado') return `${base} border-amber-500/35 bg-amber-500/10 text-amber-200`
-  return `${base} border-line bg-surface text-slate-300`
+  return `${base} border-line bg-surface text-ink-secondary`
 }
 
 function stepDot(state: TraceEntry['state']): string {
@@ -186,5 +186,5 @@ function stepDot(state: TraceEntry['state']): string {
   if (state === 'exitoso') return `${base} bg-success/20 text-success`
   if (state === 'error') return `${base} bg-danger/20 text-danger`
   if (state === 'bloqueado') return `${base} bg-amber-500/20 text-amber-200`
-  return `${base} bg-surface text-slate-300`
+  return `${base} bg-surface text-ink-secondary`
 }

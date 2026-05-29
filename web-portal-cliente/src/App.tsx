@@ -14,14 +14,7 @@ import HistorialPage from './pages/HistorialPage'
 
 export default function App() {
   return (
-    <div
-      className="portal-app min-h-dvh min-h-screen bg-[#F8F6F2] font-sans text-[#1F2937] antialiased"
-      style={{
-        backgroundColor: '#f8f6f2',
-        color: '#1f2937',
-        minHeight: '100dvh',
-      }}
-    >
+    <div className="portal-app min-h-dvh min-h-screen bg-canvas font-sans text-ink antialiased">
       <BrowserRouter>
         <AuthProvider>
           <SessionLogProvider>

@@ -37,8 +37,8 @@ export default function HistorialPage() {
             className={[
               'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
               tipo === f.id
-                ? 'border-accent-soft bg-accent-soft/30 text-slate-100'
-                : 'border-line bg-surface/50 text-muted hover:border-accent-soft/40 hover:text-slate-200',
+                ? 'border-accent/30 bg-accent-soft text-accent'
+                : 'border-line bg-surface text-muted hover:border-accent/30 hover:text-ink-secondary',
             ].join(' ')}
           >
             {f.label}

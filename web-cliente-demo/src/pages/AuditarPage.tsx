@@ -52,13 +52,13 @@ const USUARIOS_DETALLE: Record<string, { nombre: string, cargo: string, depto: s
 }
 
 const input =
-  'w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-slate-200 outline-none placeholder:text-slate-500 focus:border-accent-soft focus:ring-2 focus:ring-accent/25'
+  'w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink-secondary outline-none placeholder:text-muted focus:border-accent-soft focus:ring-2 focus:ring-accent/25'
 const btn =
-  'inline-flex items-center justify-center rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-slate-100 shadow-sm transition-colors hover:bg-accent-hover disabled:opacity-50'
+  'admin-btn-primary shadow-sm transition-colors hover:bg-accent-hover disabled:opacity-50'
 const btnGhost =
-  'inline-flex items-center justify-center rounded-xl border border-line bg-surface/60 px-4 py-2 text-sm text-slate-200 hover:bg-elevated disabled:opacity-50'
+  'inline-flex items-center justify-center rounded-xl border border-line bg-gray-50 px-4 py-2 text-sm text-ink-secondary hover:bg-gray-50 disabled:opacity-50'
 const btnChip =
-  'rounded-lg border border-line bg-surface/50 px-2.5 py-1 text-xs text-slate-300 hover:border-accent/30 hover:text-slate-100'
+  'rounded-lg border border-line bg-gray-50 px-2.5 py-1 text-xs text-ink-secondary hover:border-accent/30 hover:text-ink'
 
 type FilaTabla = {
   id: string
@@ -432,14 +432,14 @@ export default function AuditarPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Auditar</h1>
+        <h1 className="text-lg font-semibold text-ink">Auditar</h1>
         <p className="mt-1 text-sm text-muted">
           Bitácora del puente HTTP más eventos del ledger. Busca por ID para ver la línea de tiempo completa.
         </p>
       </div>
 
       {!puedeConsultarApi ? (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/95">
+        <div className="rounded-xl border admin-alert-warning">
           <p>
             {mode !== 'api'
               ? 'Pasá a modo «Red / API» en Credenciales para consultar el middleware.'
@@ -451,9 +451,9 @@ export default function AuditarPage() {
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-line bg-elevated/90 p-4 shadow-card">
+      <div className="admin-card p-4 shadow-card">
         <p className="mb-3 text-xs text-muted">
-          Elegí fechas con el calendario (formato <span className="font-mono text-slate-400">YYYY-MM-DD</span>). El servidor interpreta el día completo en UTC.
+          Elegí fechas con el calendario (formato <span className="font-mono text-muted">YYYY-MM-DD</span>). El servidor interpreta el día completo en UTC.
         </p>
         <div className="mb-3 flex flex-wrap gap-2">
           <button type="button" className={btnChip} onClick={presetHoy}>
@@ -547,7 +547,7 @@ export default function AuditarPage() {
       </div>
 
       {error ? (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100/95">
+        <div className="rounded-md border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
           <p>{error}</p>
           {error.includes('401') || error.includes('403') ? (
             <p className="mt-2 text-xs text-muted">Revise X-API-Key y rol en Credenciales.</p>
@@ -557,19 +557,19 @@ export default function AuditarPage() {
 
       {/* Panel de resultados: Línea de Tiempo del registro buscado */}
       {(lineaError || lineaTiempo) && (
-        <div className="rounded-2xl border border-accent/20 bg-elevated/90 p-5 shadow-card animate-in fade-in duration-200">
+        <div className="rounded-2xl border border-accent/20 bg-surface p-5 shadow-card animate-in fade-in duration-200">
           <div className="mb-3 flex items-center justify-between">
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-wider text-accent">Línea de Tiempo del Registro</h2>
               {lineaTiempo && (
                 <p className="mt-0.5 text-xs text-muted">
-                  <span className="font-mono text-slate-300">{lineaTiempo.clienteId}</span>
+                  <span className="font-mono text-ink-secondary">{lineaTiempo.clienteId}</span>
                   <span className="ml-2">— {lineaTiempo.acciones.length} acción(es)</span>
                 </p>
               )}
             </div>
             <button
-              className="text-[10px] text-muted hover:text-slate-300 transition-colors"
+              className="text-[10px] text-muted hover:text-ink-secondary transition-colors"
               onClick={() => { setLineaTiempo(null); setLineaError(null) }}
             >
               ✕ Cerrar
@@ -577,7 +577,7 @@ export default function AuditarPage() {
           </div>
 
           {lineaError && (
-            <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-xs text-rose-300">{lineaError}</p>
+            <p className="rounded-md border border-danger/30 bg-danger-soft px-4 py-2 text-xs text-danger-ink">{lineaError}</p>
           )}
 
           {lineaTiempo && lineaTiempo.acciones.length === 0 && (
@@ -593,7 +593,7 @@ export default function AuditarPage() {
                   return (
                     <div key={`${acc.txId}-${i}`} className="flex items-center gap-2">
                       {i > 0 && (
-                        <svg className="h-4 w-4 flex-shrink-0 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-4 w-4 flex-shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
                         </svg>
                       )}
@@ -611,7 +611,7 @@ export default function AuditarPage() {
                               : 'border-sky-500/30 bg-sky-500/5'
                         }`}
                       >
-                        <span className="absolute -top-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full bg-slate-700 text-[9px] font-bold text-slate-300 ring-1 ring-slate-600">
+                        <span className="absolute -top-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full bg-slate-700 text-[9px] font-bold text-ink-secondary ring-1 ring-slate-600">
                           {i + 1}
                         </span>
                         <div className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-sm ${
@@ -628,7 +628,7 @@ export default function AuditarPage() {
                             : 'text-sky-400'
                           }`}>{acc.etiqueta}</p>
                           <p className="mt-0.5 text-[10px] text-muted">{formatDemoDateTime(acc.fecha)}</p>
-                          <p className="mt-1 font-mono text-[9px] text-slate-500">{acc.txId.slice(0, 14)}…</p>
+                          <p className="mt-1 font-mono text-[9px] text-muted">{acc.txId.slice(0, 14)}…</p>
                         </div>
                       </button>
                     </div>
@@ -655,21 +655,21 @@ export default function AuditarPage() {
             onClick={() => setSelectedAccionIdx(null)}
           >
             <div
-              className="w-full max-w-5xl h-[85vh] rounded-2xl border border-sky-500/30 bg-[#121420] shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col overflow-hidden"
+              className="w-full max-w-5xl h-[85vh] rounded-md border border-line bg-surface shadow-card-md animate-in zoom-in-95 duration-200 flex flex-col overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Top Navbar */}
               <div className="flex items-center justify-between border-b border-line bg-[#16192b] px-6 py-4">
                 <div>
-                  <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-ink flex items-center gap-2">
                     <span className="flex h-5 w-5 items-center justify-center rounded bg-sky-500/20 text-xs text-sky-400 font-sans">✎</span>
                     Panel de Auditoría de Blockchain — Control de Revisiones
                   </h2>
-                  <p className="text-[10px] text-muted mt-0.5">Código de Registro: <span className="font-mono text-slate-300 font-bold">{lineaTiempo.clienteId}</span></p>
+                  <p className="text-[10px] text-muted mt-0.5">Código de Registro: <span className="font-mono text-ink-secondary font-bold">{lineaTiempo.clienteId}</span></p>
                 </div>
                 <button
                   onClick={() => setSelectedAccionIdx(null)}
-                  className="rounded-lg bg-surface/50 border border-line px-3.5 py-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                  className="rounded-lg bg-gray-50 border border-line px-3.5 py-1.5 text-xs text-muted hover:text-ink-secondary transition-colors"
                 >
                   Cerrar
                 </button>
@@ -701,7 +701,7 @@ export default function AuditarPage() {
                           className={`w-full text-left p-3 rounded-xl border transition-all flex items-start gap-3 hover:scale-[1.01] ${
                             isSelected
                               ? 'border-sky-500 bg-sky-500/10 ring-1 ring-sky-500/40'
-                              : 'border-line/60 bg-surface/30 hover:border-line'
+                              : 'border-line/60 bg-gray-50 hover:border-line'
                           }`}
                         >
                           <div className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
@@ -727,7 +727,7 @@ export default function AuditarPage() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-[10px] text-slate-300 truncate mt-0.5">{formatDemoDateTime(acc.fecha)}</p>
+                            <p className="text-[10px] text-ink-secondary truncate mt-0.5">{formatDemoDateTime(acc.fecha)}</p>
                             <p className="text-[9px] text-muted font-mono truncate mt-1">Tx: {acc.txId.slice(0, 24)}…</p>
                           </div>
                         </button>
@@ -741,7 +741,7 @@ export default function AuditarPage() {
                   {/* Action Details Header */}
                   <div className="bg-[#16192b]/20 border-b border-line/30 p-4">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-400/80">Detalle de la Modificación</p>
-                    <h3 className="text-xs font-bold text-slate-100 mt-1 flex items-center gap-1.5">
+                    <h3 className="text-xs font-bold text-ink mt-1 flex items-center gap-1.5">
                       {selectedAcc.tipo === 'creado' ? (
                         <span className="text-emerald-400 flex items-center gap-1">★ Snap Inmutable Inicial (Creación)</span>
                       ) : (
@@ -749,18 +749,18 @@ export default function AuditarPage() {
                       )}
                     </h3>
                     
-                    <div className="grid grid-cols-2 gap-4 mt-3 text-[10px] text-slate-400 bg-surface/20 p-2.5 rounded-lg border border-line/40">
+                    <div className="grid grid-cols-2 gap-4 mt-3 text-[10px] text-muted bg-surface/20 p-2.5 rounded-lg border border-line/40">
                       <div>
                         <span className="text-muted block">Autor / Firma digital:</span>
-                        <span className="text-slate-200 font-medium">{selectedAutor}</span>
+                        <span className="text-ink-secondary font-medium">{selectedAutor}</span>
                       </div>
                       <div>
                         <span className="text-muted block">Fecha de Registro (Ledger):</span>
-                        <span className="text-slate-200 font-medium">{formatDemoDateTime(selectedAcc.fecha)}</span>
+                        <span className="text-ink-secondary font-medium">{formatDemoDateTime(selectedAcc.fecha)}</span>
                       </div>
                       <div className="col-span-2">
                         <span className="text-muted block">Enlace Criptográfico / TxID:</span>
-                        <span className="text-slate-300 font-mono block break-all">{selectedAcc.txId}</span>
+                        <span className="text-ink-secondary font-mono block break-all">{selectedAcc.txId}</span>
                       </div>
                     </div>
                   </div>
@@ -802,7 +802,7 @@ export default function AuditarPage() {
 
                             return (
                               <tr key={campo} className={`transition-colors ${cambió ? 'bg-sky-500/5 hover:bg-sky-500/10' : 'hover:bg-surface/20'}`}>
-                                <td className={`py-3 font-semibold ${cambió ? 'text-sky-400' : 'text-slate-400'}`}>
+                                <td className={`py-3 font-semibold ${cambió ? 'text-sky-400' : 'text-muted'}`}>
                                   {campo}
                                 </td>
                                 <td className="py-3">
@@ -811,13 +811,13 @@ export default function AuditarPage() {
                                       <span className="rounded bg-rose-500/10 px-1.5 py-0.5 font-mono text-[10px] text-rose-300/80 line-through">
                                         {anteriorStr || '(vacío)'}
                                       </span>
-                                      <span className="text-slate-500 text-[10px]">→</span>
+                                      <span className="text-muted text-[10px]">→</span>
                                       <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 font-mono text-[10px] font-medium text-emerald-400">
                                         {actualStr || '(vacío)'}
                                       </span>
                                     </div>
                                   ) : (
-                                    <span className="font-mono text-slate-300">{actualStr || '—'}</span>
+                                    <span className="font-mono text-ink-secondary">{actualStr || '—'}</span>
                                   )}
                                 </td>
                               </tr>
@@ -854,9 +854,9 @@ export default function AuditarPage() {
         </p>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-line bg-elevated/90 shadow-card">
+      <div className="min-h-0 flex-1 overflow-auto admin-card shadow-card">
         <table className="w-full text-left text-sm">
-          <thead className="sticky top-0 z-10 border-b border-line bg-surface/95 text-xs uppercase text-muted backdrop-blur-sm">
+          <thead className="sticky top-0 z-10 border-b border-line bg-gray-50 text-xs uppercase text-muted backdrop-blur-sm">
             <tr>
               <th className="w-8 px-2 py-2"></th>
               <th className="px-3 py-2 font-medium">Código</th>
@@ -880,7 +880,7 @@ export default function AuditarPage() {
               return (
                 <Fragment key={g.codigo}>
                   <tr
-                    className="cursor-pointer hover:bg-surface/40 transition-colors"
+                    className="cursor-pointer hover:bg-gray-50 transition-colors"
                     onClick={() => toggleExpandido(g.codigo)}
                   >
                     <td className="px-2 py-2 text-center text-muted">
@@ -891,17 +891,17 @@ export default function AuditarPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                       </svg>
                     </td>
-                    <td className="px-3 py-2 font-medium text-slate-100">{g.codigo}</td>
-                    <td className="px-3 py-2 text-slate-300">{g.nombre}</td>
+                    <td className="px-3 py-2 font-medium text-ink">{g.codigo}</td>
+                    <td className="px-3 py-2 text-ink-secondary">{g.nombre}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-xs text-muted">{formatDemoDateTime(g.fechaUltima)}</td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-1.5">
                         <div className={`h-1.5 w-1.5 rounded-full ${colorIndicadorAutor(g.autorUltimo)}`}></div>
-                        <span className="text-[11px] font-medium text-slate-200">{g.autorUltimo}</span>
+                        <span className="text-[11px] font-medium text-ink-secondary">{g.autorUltimo}</span>
                       </div>
                     </td>
                     <td className="px-3 py-2">
-                      <span className={`rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase ${g.estadoUltimo.includes('ACTIVO') || g.estadoUltimo.includes('exito') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'}`}>
+                      <span className={`rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase ${g.estadoUltimo.includes('ACTIVO') || g.estadoUltimo.includes('exito') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-muted'}`}>
                         {g.estadoUltimo}
                       </span>
                     </td>
@@ -913,11 +913,11 @@ export default function AuditarPage() {
                   </tr>
 
                   {isOpen && (
-                    <tr className="bg-surface/30">
+                    <tr className="bg-gray-50">
                       <td colSpan={7} className="px-0 py-0">
                         <div className="overflow-hidden border-t border-line">
                           <table className="w-full text-left text-xs">
-                            <thead className="bg-surface/60 text-[10px] uppercase text-muted">
+                            <thead className="bg-gray-50 text-[10px] uppercase text-muted">
                               <tr>
                                 <th className="px-3 py-1.5 font-medium">Fecha</th>
                                 <th className="px-3 py-1.5 font-medium text-center">Bloque</th>
@@ -938,7 +938,7 @@ export default function AuditarPage() {
                                   return (
                                     <tr
                                       key={r.id}
-                                      className={`hover:bg-surface/60 ${selectedIdx === i ? 'bg-accent/10' : ''}`}
+                                      className={`hover:bg-gray-50 ${selectedIdx === i ? 'bg-accent/10' : ''}`}
                                     >
                                       <td className="whitespace-nowrap px-3 py-1.5 text-muted">
                                         <span className="mr-2 inline-block rounded bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold text-accent">
@@ -952,7 +952,7 @@ export default function AuditarPage() {
                                       <td className="px-3 py-1.5">
                                         <div className="flex items-center gap-1.5 group">
                                           <div className={`h-1.5 w-1.5 rounded-full ${colorIndicadorAutor(r.autor)}`}></div>
-                                          <span className="text-[11px] font-medium text-slate-200">{r.autor}</span>
+                                          <span className="text-[11px] font-medium text-ink-secondary">{r.autor}</span>
                                           {USUARIOS_DETALLE[r.autor] && (
                                             <button
                                               onClick={(e) => { e.stopPropagation(); setSelectedUsuario(r.autor) }}
@@ -965,7 +965,7 @@ export default function AuditarPage() {
                                         </div>
                                       </td>
                                       <td className="px-3 py-1.5">
-                                        <span className={`rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase ${r.estado.includes('ACTIVO') || r.estado.includes('exito') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'}`}>{r.estado}</span>
+                                        <span className={`rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase ${r.estado.includes('ACTIVO') || r.estado.includes('exito') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-muted'}`}>{r.estado}</span>
                                       </td>
                                       <td className="px-3 py-1.5 font-mono text-[10px] text-muted">
                                         <div className="flex items-center gap-2">
@@ -1018,15 +1018,15 @@ export default function AuditarPage() {
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="w-full max-w-2xl rounded-2xl border border-accent/30 bg-surface/95 p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-full max-w-2xl rounded-2xl border border-accent/30 bg-gray-50 p-6 shadow-2xl animate-in zoom-in-95 duration-200">
               <div className="mb-4 flex items-center justify-between border-b border-line pb-4">
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-100">
+                  <h3 className="text-sm font-semibold text-ink">
                     {rowAnterior ? 'Comparativa de Cambios' : 'Registro Inicial del Cliente'}
                   </h3>
                   <p className="text-[10px] text-muted font-mono truncate max-w-[300px]">{row.firma}</p>
                 </div>
-                <button onClick={() => setSelectedIdx(null)} className="rounded-lg bg-surface/60 px-3 py-1.5 text-xs text-slate-200 hover:bg-elevated transition-colors">Cerrar</button>
+                <button onClick={() => setSelectedIdx(null)} className="rounded-lg bg-gray-50 px-3 py-1.5 text-xs text-ink-secondary hover:bg-gray-50 transition-colors">Cerrar</button>
               </div>
 
               <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
@@ -1038,7 +1038,7 @@ export default function AuditarPage() {
                   ) : null}
                   <div className="overflow-hidden rounded-xl border border-line bg-surface/20">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-surface/40 text-[10px] uppercase text-muted">
+                      <thead className="bg-gray-50 text-[10px] uppercase text-muted">
                         <tr>
                           <th className="px-4 py-2 font-semibold">Campo</th>
                           <th className="px-4 py-2 font-semibold">Estado Actual / Cambio</th>
@@ -1049,7 +1049,7 @@ export default function AuditarPage() {
                           const cambio = cambios[campo]
                           return (
                             <tr key={campo} className="hover:bg-white/[0.02]">
-                              <td className="px-4 py-2.5 font-medium text-slate-500">{campo}</td>
+                              <td className="px-4 py-2.5 font-medium text-muted">{campo}</td>
                               <td className="px-4 py-2.5">
                                 {cambio ? (
                                   <div className="flex flex-wrap items-center gap-2">
@@ -1062,7 +1062,7 @@ export default function AuditarPage() {
                                     </span>
                                   </div>
                                 ) : (
-                                  <span className="text-slate-300 font-mono">{str(row.cliente[campo]) || '(vacío)'}</span>
+                                  <span className="text-ink-secondary font-mono">{str(row.cliente[campo]) || '(vacío)'}</span>
                                 )}
                               </td>
                             </tr>
@@ -1097,22 +1097,22 @@ export default function AuditarPage() {
 
               {/* Foto de Perfil */}
               <div className="absolute top-12 left-1/2 -translate-x-1/2">
-                <div className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-surface bg-elevated shadow-xl">
+                <div className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-surface bg-gray-50 shadow-xl">
                   <span className="text-3xl font-bold text-accent">{user.nombre.charAt(0)}</span>
                 </div>
               </div>
 
               <div className="mt-16 px-8 pb-10 text-center">
-                <h3 className="text-xl font-bold text-slate-100">{user.nombre}</h3>
+                <h3 className="text-xl font-bold text-ink">{user.nombre}</h3>
                 <p className="text-sm font-semibold text-accent">{user.cargo}</p>
                 <p className="mt-1 text-xs text-muted">{user.depto}</p>
 
                 <div className="mt-8 grid grid-cols-2 gap-4">
-                  <div className="rounded-2xl bg-white/5 p-4 border border-white/5">
+                  <div className="rounded-md bg-gray-50 p-4 border border-line">
                     <p className="text-[10px] uppercase tracking-widest text-muted">Matrícula</p>
-                    <p className="mt-1 font-mono text-sm font-bold text-slate-200">{user.matricula}</p>
+                    <p className="mt-1 font-mono text-sm font-bold text-ink-secondary">{user.matricula}</p>
                   </div>
-                  <div className="rounded-2xl bg-white/5 p-4 border border-white/5">
+                  <div className="rounded-md bg-gray-50 p-4 border border-line">
                     <p className="text-[10px] uppercase tracking-widest text-muted">Estado Red</p>
                     <p className="mt-1 text-sm font-bold text-emerald-400">Verificado ✅</p>
                   </div>
@@ -1120,7 +1120,7 @@ export default function AuditarPage() {
 
                 <div className="mt-6 text-left">
                   <p className="text-[10px] uppercase tracking-widest text-muted mb-2">Biografía y Atribuciones</p>
-                  <p className="text-xs leading-relaxed text-slate-400 italic">"{user.bio}"</p>
+                  <p className="text-xs leading-relaxed text-muted italic">"{user.bio}"</p>
                 </div>
 
                 <button

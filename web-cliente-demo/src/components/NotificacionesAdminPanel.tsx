@@ -8,8 +8,9 @@ import { etiquetaOrganizacion } from '../lib/organizacion'
 import { useNotificacionesAdmin } from '../lib/notificacionesAdminHook'
 import type { NotificacionAdmin } from '../services/apiNotificacionesAdmin'
 
-const PANEL_BG = '#131a24'
-const CARD_BG = '#1a2330'
+const PANEL_BG = '#ffffff'
+const CARD_BG = '#f9fafb'
+const BORDER_COLOR = '#e5e7eb'
 const OVERLAY_Z = 9998
 const DRAWER_Z = 9999
 
@@ -60,11 +61,11 @@ export function NotificacionesAdminPanel() {
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
-        className="relative flex h-9 items-center gap-1.5 rounded-full border border-line bg-elevated px-3 text-xs font-medium text-slate-200 hover:bg-surface"
+        className="relative flex h-9 items-center gap-1.5 rounded-md border border-line bg-gray-50 px-3 text-xs font-medium text-ink-secondary hover:bg-gray-100"
         title="Centro de avisos"
         aria-expanded={abierto}
       >
-        <IconBell className="h-4 w-4 text-slate-300" />
+        <IconBell className="h-4 w-4 text-muted" />
         <span className="hidden sm:inline">Avisos</span>
         <EstadoPill estado={estado} />
         {noLeidas > 0 && (
@@ -125,12 +126,12 @@ function Drawer({ items, estado, error, organizacion, onCerrar, onReintentar, on
     <>
       <div
         className="fixed inset-0"
-        style={{ zIndex: OVERLAY_Z, backgroundColor: 'rgba(0,0,0,0.72)' }}
+        style={{ zIndex: OVERLAY_Z, backgroundColor: 'rgba(0,0,0,0.4)' }}
         onClick={onCerrar}
         aria-hidden
       />
       <aside
-        className="fixed right-0 top-0 flex h-[100dvh] w-full flex-col border-l border-[#2a3545] shadow-2xl"
+        className="fixed right-0 top-0 flex h-[100dvh] w-full flex-col border-l border-line shadow-card-md"
         style={{ zIndex: DRAWER_Z, backgroundColor: PANEL_BG, maxWidth: 'min(92vw, 22rem)' }}
         role="dialog"
         aria-modal="true"
@@ -138,23 +139,23 @@ function Drawer({ items, estado, error, organizacion, onCerrar, onReintentar, on
       >
         <header
           className="shrink-0 border-b px-5 py-4"
-          style={{ borderColor: '#2a3545', backgroundColor: PANEL_BG }}
+          style={{ borderColor: BORDER_COLOR, backgroundColor: PANEL_BG }}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 pr-2">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8b9aaf]">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted">
                 CampusChain · {organizacion}
               </p>
-              <h2 id="notificaciones-drawer-title" className="text-base font-semibold text-slate-100">
+              <h2 id="notificaciones-drawer-title" className="text-base font-semibold text-ink">
                 Centro de avisos
               </h2>
-              <p className="mt-0.5 text-xs text-[#8b9aaf]">Cambios recientes en la red.</p>
+              <p className="mt-0.5 text-xs text-muted">Cambios recientes en la red.</p>
             </div>
             <button
               type="button"
               onClick={onCerrar}
-              className="shrink-0 rounded-lg border p-2 text-[#8b9aaf] hover:text-slate-100"
-              style={{ borderColor: '#2a3545', backgroundColor: CARD_BG }}
+              className="shrink-0 rounded-md border p-2 text-muted hover:bg-gray-100 hover:text-ink"
+              style={{ borderColor: BORDER_COLOR, backgroundColor: CARD_BG }}
               aria-label="Cerrar"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -166,9 +167,9 @@ function Drawer({ items, estado, error, organizacion, onCerrar, onReintentar, on
 
         <div
           className="flex shrink-0 items-center justify-between border-b px-5 py-2.5 text-xs"
-          style={{ borderColor: '#2a3545', backgroundColor: PANEL_BG }}
+          style={{ borderColor: BORDER_COLOR, backgroundColor: PANEL_BG }}
         >
-          <div className="flex items-center gap-2 text-[#8b9aaf]">
+          <div className="flex items-center gap-2 text-muted">
             <EstadoDot estado={estado} />
             <span>
               {estado === 'conectado' && 'Recibiendo avisos en vivo'}
@@ -182,7 +183,7 @@ function Drawer({ items, estado, error, organizacion, onCerrar, onReintentar, on
               <button
                 type="button"
                 onClick={onReintentar}
-                className="rounded-md bg-[#3d5266] px-2.5 py-1 font-medium text-slate-100 hover:bg-[#5a7a9a]"
+                className="rounded-md bg-accent px-2.5 py-1 font-medium text-white hover:bg-accent-hover"
               >
                 Reintentar
               </button>
@@ -191,8 +192,8 @@ function Drawer({ items, estado, error, organizacion, onCerrar, onReintentar, on
               type="button"
               onClick={onLimpiar}
               disabled={items.length === 0}
-              className="rounded-md border px-2.5 py-1 font-medium text-[#8b9aaf] hover:text-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-              style={{ borderColor: '#2a3545', backgroundColor: CARD_BG }}
+              className="rounded-md border px-2.5 py-1 font-medium text-muted hover:bg-gray-100 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ borderColor: BORDER_COLOR, backgroundColor: CARD_BG }}
               title="Borrar todos los avisos"
             >
               Limpiar
@@ -202,8 +203,8 @@ function Drawer({ items, estado, error, organizacion, onCerrar, onReintentar, on
 
         {error && (
           <div
-            className="shrink-0 border-b px-5 py-2.5 text-sm text-[#e8a0a0]"
-            style={{ borderColor: '#5c3030', backgroundColor: '#2a1818' }}
+            className="shrink-0 border-b px-5 py-2.5 text-sm text-danger-ink"
+            style={{ borderColor: '#fecaca', backgroundColor: '#fef2f2' }}
           >
             {error}
           </div>
@@ -211,7 +212,7 @@ function Drawer({ items, estado, error, organizacion, onCerrar, onReintentar, on
 
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3" style={{ backgroundColor: PANEL_BG }}>
           {ordenados.length === 0 ? (
-            <p className="px-2 py-8 text-center text-xs text-[#8b9aaf]">
+            <p className="px-2 py-8 text-center text-xs text-muted">
               Sin avisos recientes.
             </p>
           ) : (
@@ -219,18 +220,18 @@ function Drawer({ items, estado, error, organizacion, onCerrar, onReintentar, on
               {ordenados.map((n) => (
                 <li
                   key={n.id}
-                  className="rounded-lg border px-3 py-2.5"
-                  style={{ borderColor: '#2a3545', backgroundColor: CARD_BG }}
+                  className="rounded-md border px-3 py-2.5"
+                  style={{ borderColor: BORDER_COLOR, backgroundColor: CARD_BG }}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-slate-100">
+                      <p className="text-xs font-medium text-ink">
                         {formatearTipoEvento(n.tipo)}
                         {n.recurso ? (
-                          <span className="font-mono text-[#6d8aad]"> · {n.recurso}</span>
+                          <span className="font-mono text-accent"> · {n.recurso}</span>
                         ) : null}
                       </p>
-                      <p className="mt-0.5 truncate text-[11px] text-[#8b9aaf]">
+                      <p className="mt-0.5 truncate text-[11px] text-muted">
                         {resumenCorto(n)}
                         {' · '}
                         {formatDemoDateTime(n.timestamp)}
@@ -241,8 +242,7 @@ function Drawer({ items, estado, error, organizacion, onCerrar, onReintentar, on
                     <button
                       type="button"
                       onClick={() => irAAuditar(n)}
-                      className="mt-2 w-full rounded-md border px-2 py-1.5 text-center text-xs font-medium text-[#6d8aad] hover:bg-[#2a3545] hover:text-slate-100"
-                      style={{ borderColor: '#3d5266', backgroundColor: PANEL_BG }}
+                      className="mt-2 w-full rounded-md border border-line bg-white px-2 py-1.5 text-center text-xs font-medium text-accent hover:bg-accent-soft"
                     >
                       Ver detalles
                     </button>
@@ -284,10 +284,10 @@ function etiquetaRol(rol: string): string {
 }
 
 function EstadoPill({ estado }: { estado: 'inactivo' | 'conectando' | 'conectado' | 'error' }) {
-  if (estado === 'conectado') return <span className="h-2 w-2 rounded-full bg-[#4a9d7a]" />
-  if (estado === 'conectando') return <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
-  if (estado === 'error') return <span className="h-2 w-2 rounded-full bg-[#b85c5c]" />
-  return <span className="h-2 w-2 rounded-full bg-slate-500" />
+  if (estado === 'conectado') return <span className="h-2 w-2 rounded-full bg-success" />
+  if (estado === 'conectando') return <span className="h-2 w-2 animate-pulse rounded-full bg-warning" />
+  if (estado === 'error') return <span className="h-2 w-2 rounded-full bg-danger" />
+  return <span className="h-2 w-2 rounded-full bg-gray-400" />
 }
 
 function EstadoDot({ estado }: { estado: 'inactivo' | 'conectando' | 'conectado' | 'error' }) {

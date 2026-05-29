@@ -83,11 +83,11 @@ export function TopBar({ onMenuClick }: TopBarProps) {
   }, [isAgricultura, pathname])
 
   return (
-    <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface/80 px-4 py-3 backdrop-blur-md sm:gap-4 sm:px-6">
+    <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-4 py-3 shadow-sm sm:gap-4 sm:px-6">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <button
           type="button"
-          className="rounded-lg p-2 text-muted hover:bg-elevated hover:text-slate-200 lg:hidden"
+          className="rounded-md p-2 text-muted hover:bg-gray-100 hover:text-ink lg:hidden"
           aria-label="Abrir menú"
           onClick={onMenuClick}
         >
@@ -97,55 +97,55 @@ export function TopBar({ onMenuClick }: TopBarProps) {
         </button>
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted">CampusChain</p>
-          <h1 className="truncate text-base font-semibold tracking-tight text-slate-100 sm:text-lg">{meta.title}</h1>
+          <h1 className="truncate text-base font-semibold tracking-tight text-ink sm:text-lg">{meta.title}</h1>
           <p className="hidden truncate text-xs text-muted sm:block">{meta.subtitle}</p>
         </div>
       </div>
 
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <div
-          className={`hidden rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide sm:block ${
-            mode === 'api' ? 'border-accent/40 bg-accent/15 text-accent' : 'border-line bg-surface/60 text-muted'
+          className={`hidden rounded-md border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide sm:block ${
+            mode === 'api' ? 'border-accent/30 bg-accent-soft text-accent' : 'border-line bg-gray-50 text-muted'
           }`}
         >
           {mode === 'api' ? 'API' : 'Sin API'}
         </div>
-        <div className="hidden items-center gap-3 md:flex">
+        <div className="hidden items-center gap-2 md:flex">
           {tenant && (
-            <span className="rounded-full border border-line bg-elevated px-3 py-1 text-xs font-medium text-slate-300">
-              Organización: <span className="text-slate-200">{etiquetaOrganizacion(tenant)}</span>
+            <span className="rounded-md border border-line bg-gray-50 px-3 py-1 text-xs font-medium text-ink-secondary">
+              Organización: <span className="text-ink">{etiquetaOrganizacion(tenant)}</span>
             </span>
           )}
-          <span className="rounded-full border border-line bg-elevated px-3 py-1 text-xs font-medium text-slate-300">
-            Rol: <span className="text-accent">{roleLabel}</span>
+          <span className="rounded-md border border-line bg-gray-50 px-3 py-1 text-xs font-medium text-ink-secondary">
+            Rol: <span className="font-semibold text-accent">{roleLabel}</span>
           </span>
-          <span className="rounded-full border border-line bg-elevated px-3 py-1 text-xs font-medium text-slate-300">
-            Espacio: <span className="text-slate-200">{workspace}</span>
+          <span className="rounded-md border border-line bg-gray-50 px-3 py-1 text-xs font-medium text-ink-secondary">
+            Espacio: <span className="text-ink">{workspace}</span>
           </span>
           <NotificacionesAdminPanel />
           <div className="relative">
             <button
               type="button"
               onClick={() => setMenuAbierto((v) => !v)}
-              className="flex items-center gap-2 rounded-full border border-line bg-elevated px-2 py-1 pr-3 hover:bg-surface"
+              className="flex items-center gap-2 rounded-md border border-line bg-gray-50 px-2 py-1 pr-3 hover:bg-gray-100"
               title={nombre}
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/20 text-[11px] font-bold text-accent">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-white">
                 {iniciales(nombre)}
               </span>
-              <span className="max-w-[140px] truncate text-xs font-medium text-slate-200">{nombre}</span>
+              <span className="max-w-[140px] truncate text-xs font-medium text-ink">{nombre}</span>
             </button>
             {menuAbierto && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setMenuAbierto(false)} aria-hidden />
-                <div className="absolute right-0 top-full z-30 mt-2 w-56 overflow-hidden rounded-xl border border-line bg-surface shadow-2xl">
-                  <div className="border-b border-line px-3 py-2 text-xs">
-                    <p className="truncate font-semibold text-slate-100">{nombre}</p>
+                <div className="absolute right-0 top-full z-30 mt-2 w-56 overflow-hidden rounded-md border border-line bg-surface shadow-card-md">
+                  <div className="border-b border-line bg-gray-50 px-3 py-2 text-xs">
+                    <p className="truncate font-semibold text-ink">{nombre}</p>
                     <p className="truncate text-muted">{usuario?.usuario}</p>
                   </div>
                   <button
                     type="button"
-                    className="block w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-elevated"
+                    className="block w-full px-3 py-2 text-left text-xs text-ink-secondary hover:bg-gray-50"
                     onClick={() => {
                       setMenuAbierto(false)
                       navigate('/credenciales')
@@ -155,7 +155,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                   </button>
                   <button
                     type="button"
-                    className="block w-full border-t border-line px-3 py-2 text-left text-xs text-danger hover:bg-danger/10"
+                    className="block w-full border-t border-line px-3 py-2 text-left text-xs text-danger hover:bg-danger-soft"
                     onClick={() => {
                       setMenuAbierto(false)
                       void logout().then(() => navigate('/login', { replace: true }))

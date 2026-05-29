@@ -5,9 +5,6 @@ import { useSettings } from '../context/SettingsContext'
 import type { ClienteApi } from '../types/api'
 import { ClienteLedgerEstadoBadge } from '../components/ClienteLedgerEstadoBadge'
 
-const btn =
-  'inline-flex items-center justify-center rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-slate-100 shadow-sm transition-colors hover:bg-accent-hover disabled:opacity-50'
-
 export default function ClientesRegistradosPage() {
   const { tenant } = useSettings()
   const isAgricultura = tenant.trim().toLowerCase() === 'agricultura'
@@ -45,28 +42,28 @@ export default function ClientesRegistradosPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">{entityLabel}</h1>
+        <h1 className="text-lg font-semibold text-ink">{entityLabel}</h1>
         <p className="mt-1 text-sm text-muted">Origen: {sourceEndpoint} · mismos datos que el panel principal</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className={btn} onClick={() => void load()} disabled={clientesLedgerLoading}>
+        <button type="button" className="admin-btn-primary" onClick={() => void load()} disabled={clientesLedgerLoading}>
           {clientesLedgerLoading ? 'Cargando…' : 'Refrescar'}
         </button>
         {!clientesLedgerLoading && !clientesLedgerError ? (
-          <span className="text-sm text-slate-300">{rows.length} registro(s) en red.</span>
+          <span className="text-sm text-muted">{rows.length} registro(s) en red.</span>
         ) : null}
       </div>
       {clientesLedgerAccessDenied ? (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/95">
+        <div className="admin-alert-warning">
           <p>{clientesLedgerError}</p>
           <Link className="mt-2 inline-block text-xs font-medium text-accent hover:underline" to="/credenciales">
             Abrir Credenciales
           </Link>
         </div>
       ) : clientesLedgerError ? (
-        <p className="text-sm text-danger/90">{clientesLedgerError}</p>
+        <p className="text-sm text-danger">{clientesLedgerError}</p>
       ) : null}
-      <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-line bg-elevated/90 shadow-card">
+      <div className="admin-table-wrap min-h-0 flex-1">
         {!clientesLedgerLoading && rows.length === 0 && !clientesLedgerError ? (
           <p className="px-4 py-8 text-center text-sm text-muted">No hay registros en red todavía.</p>
         ) : null}
@@ -74,8 +71,8 @@ export default function ClientesRegistradosPage() {
           <p className="px-4 py-8 text-center text-sm text-muted">Listado no disponible. Revise credenciales y vuelva a refrescar.</p>
         ) : null}
         {rows.length > 0 ? (
-          <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 z-10 border-b border-line bg-surface/95 text-xs uppercase text-muted backdrop-blur-sm">
+          <table className="admin-table w-full text-left text-sm">
+            <thead>
               <tr>
                 <th className="px-4 py-2 font-medium">{isAgricultura ? 'datoId' : 'clienteId'}</th>
                 <th className="px-4 py-2 font-medium">nombre</th>
@@ -84,19 +81,19 @@ export default function ClientesRegistradosPage() {
                 <th className="px-4 py-2 text-right font-medium">acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody>
               {rows.map((r) => (
                 <tr
                   key={r.clienteId}
                   id={`cliente-row-${r.clienteId}`}
                   className={
                     focusId === r.clienteId
-                      ? 'bg-accent/10 ring-1 ring-inset ring-accent/25'
+                      ? 'bg-accent-soft/60 ring-1 ring-inset ring-accent/25'
                       : undefined
                   }
                 >
-                  <td className="px-4 py-2 font-mono text-xs text-slate-200">{r.clienteId}</td>
-                  <td className="px-4 py-2 text-slate-200">{r.nombre}</td>
+                  <td className="px-4 py-2 font-mono text-xs text-ink-secondary">{r.clienteId}</td>
+                  <td className="px-4 py-2 text-ink">{r.nombre}</td>
                   <td className="px-4 py-2 text-muted">
                     {r.tipoDocumento} {r.numeroDocumento}
                   </td>
@@ -106,12 +103,12 @@ export default function ClientesRegistradosPage() {
                   <td className="px-4 py-2 text-right text-xs">
                     <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
                       {isAgricultura ? (
-                        <Link className="text-accent hover:underline" to="/auditoria" state={{ recursoId: r.clienteId }}>
+                        <Link className="font-medium text-accent hover:underline" to="/auditoria" state={{ recursoId: r.clienteId }}>
                           Auditar
                         </Link>
                       ) : (
                         <>
-                          <Link className="text-accent hover:underline" to="/consultas" state={{ clienteId: r.clienteId }}>
+                          <Link className="font-medium text-accent hover:underline" to="/consultas" state={{ clienteId: r.clienteId }}>
                             Detalle
                           </Link>
                           <Link

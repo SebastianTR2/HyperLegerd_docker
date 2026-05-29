@@ -106,18 +106,18 @@ export default function ClienteDetallePage() {
   }, [clienteId])
 
   if (!clienteId) {
-    return <p className="text-sm text-[#6B7280]">Indique un código de cliente válido.</p>
+    return <p className="text-sm text-muted">Indique un código de cliente válido.</p>
   }
 
   if (loading) {
-    return <p className="text-sm text-[#6B7280]">Cargando…</p>
+    return <p className="text-sm text-muted">Cargando…</p>
   }
 
   if (accessBlocked) {
     return (
       <div className="mx-auto max-w-lg space-y-4">
         <AccesoServicioBloqueado />
-        <Link className="text-sm text-[#D97706] hover:underline" to="/clientes">
+        <Link className="text-sm text-accent hover:underline" to="/clientes">
           Volver al listado
         </Link>
       </div>
@@ -128,8 +128,8 @@ export default function ClienteDetallePage() {
     return (
       <div className="mx-auto max-w-lg">
         <Card title="Consulta">
-          <p className="text-sm text-[#6B7280]">{mensajeClienteNoEncontrado()}</p>
-          <Link className="mt-4 inline-block text-sm text-[#D97706] hover:underline" to="/clientes">
+          <p className="text-sm text-muted">{mensajeClienteNoEncontrado()}</p>
+          <Link className="mt-4 inline-block text-sm text-accent hover:underline" to="/clientes">
             Volver al listado
           </Link>
         </Card>
@@ -152,54 +152,54 @@ export default function ClienteDetallePage() {
       <Card title="Ficha del cliente">
         <dl className="grid gap-4 sm:grid-cols-2">
           <div>
-            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Código</dt>
-            <dd className="mt-1 font-mono text-sm text-[#1F2937]">{data.codigo}</dd>
+            <dt className="text-[11px] font-medium uppercase text-muted">Código</dt>
+            <dd className="mt-1 font-mono text-sm text-ink">{data.codigo}</dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Estado</dt>
+            <dt className="text-[11px] font-medium uppercase text-muted">Estado</dt>
             <dd className="mt-1">
               <Badge tone={badgeTone}>{data.estadoEtiqueta}</Badge>
             </dd>
           </div>
           <div className="sm:col-span-2">
-            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Nombre</dt>
-            <dd className="mt-1 text-sm text-[#1F2937]">{data.nombre}</dd>
+            <dt className="text-[11px] font-medium uppercase text-muted">Nombre</dt>
+            <dd className="mt-1 text-sm text-ink">{data.nombre}</dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Documento</dt>
-            <dd className="mt-1 text-sm text-[#1F2937]">
+            <dt className="text-[11px] font-medium uppercase text-muted">Documento</dt>
+            <dd className="mt-1 text-sm text-ink">
               {data.tipoDocumento} {data.numeroDocumento}
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Fecha de registro</dt>
-            <dd className="mt-1 text-sm text-[#1F2937]">{formatDisplayDate(data.fechaAlta)}</dd>
+            <dt className="text-[11px] font-medium uppercase text-muted">Fecha de registro</dt>
+            <dd className="mt-1 text-sm text-ink">{formatDisplayDate(data.fechaAlta)}</dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Teléfono</dt>
-            <dd className="mt-1 text-sm text-[#1F2937]">{data.telefono || '—'}</dd>
+            <dt className="text-[11px] font-medium uppercase text-muted">Teléfono</dt>
+            <dd className="mt-1 text-sm text-ink">{data.telefono || '—'}</dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Correo</dt>
-            <dd className="mt-1 text-sm text-[#1F2937]">{data.correo || '—'}</dd>
+            <dt className="text-[11px] font-medium uppercase text-muted">Correo</dt>
+            <dd className="mt-1 text-sm text-ink">{data.correo || '—'}</dd>
           </div>
           <div className="sm:col-span-2">
-            <dt className="text-[11px] font-medium uppercase text-[#6B7280]">Notas</dt>
-            <dd className="mt-1 text-sm text-[#6B7280]">{data.notas || '—'}</dd>
+            <dt className="text-[11px] font-medium uppercase text-muted">Notas</dt>
+            <dd className="mt-1 text-sm text-muted">{data.notas || '—'}</dd>
           </div>
         </dl>
 
         {data.informacionAuditoria ? (
-          <div className="mt-4 border-t border-[#E8E1D8] pt-4">
+          <div className="mt-4 border-t border-line pt-4">
             <Accordion title="Información de auditoría">
-              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-[#6B7280]">
+              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-muted">
                 {data.informacionAuditoria}
               </pre>
             </Accordion>
           </div>
         ) : null}
 
-        <div className="mt-6 flex flex-wrap gap-2 border-t border-[#E8E1D8] pt-4">
+        <div className="mt-6 flex flex-wrap gap-2 border-t border-line pt-4">
           <Link to="/clientes">
             <Button variant="secondary">Volver</Button>
           </Link>
@@ -255,9 +255,9 @@ export default function ClienteDetallePage() {
           </>
         }
       >
-        <p className="text-sm text-[#1F2937]">¿Deseas dar de baja este cliente?</p>
-        <p className="mt-2 text-sm text-[#6B7280]">Esta acción quedará registrada.</p>
-        {bajaError ? <p className="mt-3 text-sm text-red-800">{bajaError}</p> : null}
+        <p className="text-sm text-ink">¿Deseas dar de baja este cliente?</p>
+        <p className="mt-2 text-sm text-muted">Esta acción quedará registrada.</p>
+        {bajaError ? <p className="mt-3 text-sm text-danger-ink">{bajaError}</p> : null}
       </Modal>
     </div>
   )

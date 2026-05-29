@@ -9,19 +9,21 @@ import { workspaceLabel } from '../lib/roles'
 import type { ClienteApi } from '../types/api'
 import { ClienteLedgerEstadoBadge } from '../components/ClienteLedgerEstadoBadge'
 
-const shortcuts = [
-  { to: '/clientes-registrados', label: 'Clientes en red', desc: 'Listado desde GET /clientes (solo lectura)' },
-  { to: '/auditoria', label: 'Auditoría del puente', desc: 'HTTP + eventos cadena, exportación CSV/JSON' },
-  { to: '/consultas', label: 'Consultas', desc: 'Cliente por clienteId exacto' },
-  { to: '/historial', label: 'Actividad de la sesión', desc: 'Operaciones observadas en esta sesión' },
-  { to: '/trazabilidad', label: 'Trazas y TXID', desc: 'Línea de tiempo y comprobación técnica' },
-  { to: '/credenciales', label: 'Perfil de sesión', desc: 'Usuario, tenant, rol y permisos' },
-] as const
-
 export default function PanelPage() {
-  const { eventos, clientesLedger, clientesLedgerLoading, clientesLedgerError, clientesLedgerAccessDenied } =
+  const { eventos, clientesLedger, clientesLedgerLoading, clientesLedgerError, clientesLedgerAccessDenied, limpiarEventos } =
     useDemoStore()
-  const { role, roleLabel } = useSettings()
+  const { role, roleLabel, tenant } = useSettings()
+  const isAgricultura = tenant.trim().toLowerCase() === 'agricultura'
+  const entityLabel = isAgricultura ? 'Lotes en red' : 'Clientes en red'
+  const listEndpoint = isAgricultura ? 'GET /datos' : 'GET /clientes'
+  const shortcuts = [
+    { to: '/clientes-registrados', label: entityLabel, desc: `Listado desde ${listEndpoint} (solo lectura)` },
+    { to: '/auditoria', label: 'Auditoría del puente', desc: 'HTTP + eventos cadena, exportación CSV/JSON' },
+    ...(!isAgricultura ? [{ to: '/consultas', label: 'Consultas', desc: 'Cliente por clienteId exacto' }] : []),
+    { to: '/historial', label: 'Actividad de la sesión', desc: 'Operaciones observadas en esta sesión' },
+    { to: '/trazabilidad', label: 'Trazas y TXID', desc: 'Línea de tiempo y comprobación técnica' },
+    { to: '/credenciales', label: 'Perfil de sesión', desc: 'Usuario, organización, rol y permisos' },
+  ] as const
   const consultasCount = eventos.filter((e) => e.tipo === 'consulta').length
   const ultimos = [...clientesLedger].sort(
     (a, b) => new Date(b.fechaAlta).getTime() - new Date(a.fechaAlta).getTime(),
@@ -34,6 +36,8 @@ export default function PanelPage() {
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <StatSummary
         totalClientesEnRed={clientesLedger.length}
+        entityLabel={entityLabel}
+        ledgerEndpointHint={`Datos del ledger vía ${listEndpoint}`}
         tokenOpsCount={0}
         consultasCount={consultasCount}
         eventosCount={eventos.length}
@@ -62,8 +66,8 @@ export default function PanelPage() {
               {workspace} · <span className="text-slate-300">{roleLabel}</span>
             </p>
             <p className="mt-3 text-xs text-muted">
-              Esta consola es un <strong>explorador audit-only</strong> del puente. Los altas, ediciones y bajas
-              de clientes se realizan en el portal del cliente.
+              Esta consola es un <strong>explorador audit-only</strong> del puente. Las mutaciones operativas se
+              realizan en el portal externo y aquí se visualizan desde la red.
             </p>
             <ul className="mt-3 space-y-2">
               <li>
@@ -109,9 +113,9 @@ export default function PanelPage() {
         <div className="flex min-h-0 flex-col lg:col-span-5">
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-line bg-elevated/90 shadow-card">
             <div className="shrink-0 border-b border-line px-4 py-3 sm:px-5">
-              <h2 className="text-sm font-semibold text-slate-100">Clientes en red</h2>
+              <h2 className="text-sm font-semibold text-slate-100">{entityLabel}</h2>
               <p className="text-xs text-muted">
-                Últimos clientes (GET /clientes). Datos desde el middleware cuando el modo API está activo.
+                Últimos registros ({listEndpoint}). Datos desde el middleware cuando el modo API está activo.
               </p>
             </div>
             <div className="min-h-0 flex-1 overflow-auto">
@@ -124,7 +128,7 @@ export default function PanelPage() {
                 </p>
               ) : null}
               {!clientesLedgerLoading && !clientesLedgerError && ultimos.length === 0 ? (
-                <p className="px-4 py-8 text-center text-sm text-muted">No hay clientes registrados todavía.</p>
+                <p className="px-4 py-8 text-center text-sm text-muted">No hay registros en red todavía.</p>
               ) : null}
               {clientesLedgerLoading ? (
                 <p className="px-4 py-8 text-center text-sm text-muted">Cargando clientes…</p>
@@ -133,16 +137,16 @@ export default function PanelPage() {
                 <table className="w-full text-left text-sm">
                   <thead className="sticky top-0 z-10 border-b border-line bg-surface/95 text-xs uppercase text-muted backdrop-blur-sm">
                     <tr>
-                      <th className="px-4 py-2 font-medium">clienteId</th>
+                      <th className="px-4 py-2 font-medium">{isAgricultura ? 'datoId' : 'clienteId'}</th>
                       <th className="px-4 py-2 font-medium">Nombre</th>
-                      <th className="hidden px-4 py-2 font-medium sm:table-cell">Documento</th>
+                      <th className="hidden px-4 py-2 font-medium sm:table-cell">{isAgricultura ? 'Código' : 'Documento'}</th>
                       <th className="px-4 py-2 font-medium">Estado</th>
                       <th className="px-4 py-2 font-medium">Alta</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
                     {ultimos.map((c) => (
-                      <UltimaFilaCliente key={c.clienteId} c={c} />
+                      <UltimaFilaCliente key={c.clienteId} c={c} isAgricultura={isAgricultura} />
                     ))}
                   </tbody>
                 </table>
@@ -153,7 +157,7 @@ export default function PanelPage() {
                 to="/clientes-registrados"
                 className="block w-full rounded-xl border border-line bg-surface/60 py-2 text-center text-xs font-medium text-slate-300 transition-colors hover:bg-elevated hover:text-slate-100"
               >
-                Ver todos los clientes
+                Ver todos los registros
               </Link>
             </div>
           </div>
@@ -167,6 +171,7 @@ export default function PanelPage() {
             emptyText="No hay actividad reciente."
             className="min-h-0 flex-1"
             bodyClassName="min-h-0"
+            onClear={limpiarEventos}
           />
         </div>
       </div>
@@ -174,7 +179,7 @@ export default function PanelPage() {
   )
 }
 
-function UltimaFilaCliente({ c }: { c: ClienteApi }) {
+function UltimaFilaCliente({ c, isAgricultura }: { c: ClienteApi; isAgricultura: boolean }) {
   return (
     <tr className="hover:bg-surface/40">
       <td className="px-4 py-2">
@@ -186,13 +191,21 @@ function UltimaFilaCliente({ c }: { c: ClienteApi }) {
           {c.clienteId}
         </Link>
         <div className="mt-1 flex flex-wrap gap-x-2 text-[10px]">
-          <Link className="text-muted hover:text-accent" to={`/historial-cliente/${encodeURIComponent(c.clienteId)}`}>
-            Historial
-          </Link>
-          <span className="text-line">·</span>
-          <Link className="text-muted hover:text-accent" to="/consultas" state={{ clienteId: c.clienteId }}>
-            Consulta
-          </Link>
+          {isAgricultura ? (
+            <Link className="text-muted hover:text-accent" to="/auditoria" state={{ recursoId: c.clienteId }}>
+              Auditar
+            </Link>
+          ) : (
+            <>
+              <Link className="text-muted hover:text-accent" to={`/historial-cliente/${encodeURIComponent(c.clienteId)}`}>
+                Historial
+              </Link>
+              <span className="text-line">·</span>
+              <Link className="text-muted hover:text-accent" to="/consultas" state={{ clienteId: c.clienteId }}>
+                Consulta
+              </Link>
+            </>
+          )}
         </div>
       </td>
       <td className="max-w-[140px] truncate px-4 py-2 text-muted">{c.nombre}</td>
@@ -200,7 +213,7 @@ function UltimaFilaCliente({ c }: { c: ClienteApi }) {
         {c.tipoDocumento} {c.numeroDocumento}
       </td>
       <td className="px-4 py-2">
-        <ClienteLedgerEstadoBadge c={c} />
+        <ClienteLedgerEstadoBadge c={c} raw={isAgricultura} />
       </td>
       <td className="whitespace-nowrap px-4 py-2 text-xs text-muted">{formatShortDate(c.fechaAlta)}</td>
     </tr>

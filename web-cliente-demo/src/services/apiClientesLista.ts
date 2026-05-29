@@ -1,5 +1,6 @@
 import { apiJson } from './apiClient'
 import { parseClienteDatos } from '../lib/apiClienteAdapter'
+import { parseDatoDatos } from '../lib/datoApiAdapter'
 import type { ClienteApi } from '../types/api'
 
 interface ListaBody {
@@ -7,13 +8,15 @@ interface ListaBody {
   datos?: unknown
 }
 
-/** GET /clientes → lista de assets en cliente_cc */
-export async function listarClientesApi(): Promise<ClienteApi[]> {
-  const j = await apiJson<ListaBody>('/clientes')
+/** Obtiene filas de ledger para el tenant activo (clientes/agricultura). */
+export async function listarClientesApi(tenant: string): Promise<ClienteApi[]> {
+  const endpoint = tenant.trim().toLowerCase() === 'agricultura' ? '/datos' : '/clientes'
+  const j = await apiJson<ListaBody>(endpoint)
   const d = j.datos
   if (d == null) return []
   if (!Array.isArray(d)) return []
+  const parser = endpoint === '/datos' ? parseDatoDatos : parseClienteDatos
   return d
-    .map((row) => parseClienteDatos(row))
+    .map((row) => parser(row))
     .filter((x): x is ClienteApi => x !== null)
 }

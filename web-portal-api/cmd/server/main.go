@@ -66,8 +66,8 @@ func main() {
 		_, ruta, _, total := registroAdmin.Estado()
 		log.Printf("usuariosadmin cargado: %d cuentas desde %s", total, ruta)
 	}
-	revocAdmin := handlers.NuevaRevocacionesMemoria()
-	adminAuthH := &handlers.AdminAuthHandler{Cfg: cfg, Registro: registroAdmin, JTIRevocados: revocAdmin}
+	revocAdmin := handlers.NuevaRevocacionesPersistentes(conn)
+	adminAuthH := &handlers.AdminAuthHandler{Cfg: cfg, Registro: registroAdmin, Revocador: revocAdmin}
 	adminProxyH := &handlers.AdminProxyHandler{Cfg: cfg, Registro: registroAdmin}
 	adminAuthMW := middleware.RequireAdminAuth(cfg, revocAdmin)
 

@@ -47,8 +47,19 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL,
+  jti TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  revoked_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_jti ON sessions(jti);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_username ON admin_sessions(username);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_jti ON admin_sessions(jti);
 `)
 	return err
 }

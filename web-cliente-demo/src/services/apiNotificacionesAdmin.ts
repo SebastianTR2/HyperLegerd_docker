@@ -34,6 +34,11 @@ export async function fetchHistorialNotificacionesAdmin(): Promise<HistorialNoti
   return apiJson<HistorialNotificacionesAdmin>('/admin/notificaciones', { method: 'GET' })
 }
 
+/** Limpia el histórico de avisos del tenant del solicitante en el servidor. */
+export async function purgarNotificacionesAdmin(): Promise<{ ok: boolean; eliminadas: number }> {
+  return apiJson<{ ok: boolean; eliminadas: number }>('/admin/notificaciones', { method: 'DELETE' })
+}
+
 export interface StreamCallbacks {
   onNotificacion: (n: NotificacionAdmin) => void
   onConectado?: () => void

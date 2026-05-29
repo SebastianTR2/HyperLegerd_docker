@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useDemoStore } from '../context/DemoStoreContext'
+import { useSettings } from '../context/SettingsContext'
 import type { ClienteApi } from '../types/api'
 import { ClienteLedgerEstadoBadge } from '../components/ClienteLedgerEstadoBadge'
 
@@ -8,6 +9,10 @@ const btn =
   'inline-flex items-center justify-center rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-slate-100 shadow-sm transition-colors hover:bg-accent-hover disabled:opacity-50'
 
 export default function ClientesRegistradosPage() {
+  const { tenant } = useSettings()
+  const isAgricultura = tenant.trim().toLowerCase() === 'agricultura'
+  const entityLabel = isAgricultura ? 'Lotes registrados' : 'Clientes registrados'
+  const sourceEndpoint = isAgricultura ? 'GET /datos' : 'GET /clientes'
   const location = useLocation()
   const focusId = useMemo(() => {
     const st = location.state as { focusId?: string } | null | undefined
@@ -40,15 +45,15 @@ export default function ClientesRegistradosPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Clientes registrados</h1>
-        <p className="mt-1 text-sm text-muted">Origen: GET /clientes · mismos datos que el panel principal</p>
+        <h1 className="text-lg font-semibold text-slate-100">{entityLabel}</h1>
+        <p className="mt-1 text-sm text-muted">Origen: {sourceEndpoint} · mismos datos que el panel principal</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" className={btn} onClick={() => void load()} disabled={clientesLedgerLoading}>
           {clientesLedgerLoading ? 'Cargando…' : 'Refrescar'}
         </button>
         {!clientesLedgerLoading && !clientesLedgerError ? (
-          <span className="text-sm text-slate-300">{rows.length} cliente(s) en red.</span>
+          <span className="text-sm text-slate-300">{rows.length} registro(s) en red.</span>
         ) : null}
       </div>
       {clientesLedgerAccessDenied ? (
@@ -63,7 +68,7 @@ export default function ClientesRegistradosPage() {
       ) : null}
       <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-line bg-elevated/90 shadow-card">
         {!clientesLedgerLoading && rows.length === 0 && !clientesLedgerError ? (
-          <p className="px-4 py-8 text-center text-sm text-muted">No hay clientes registrados todavía.</p>
+          <p className="px-4 py-8 text-center text-sm text-muted">No hay registros en red todavía.</p>
         ) : null}
         {!clientesLedgerLoading && rows.length === 0 && clientesLedgerAccessDenied ? (
           <p className="px-4 py-8 text-center text-sm text-muted">Listado no disponible. Revise credenciales y vuelva a refrescar.</p>
@@ -72,9 +77,9 @@ export default function ClientesRegistradosPage() {
           <table className="w-full text-left text-sm">
             <thead className="sticky top-0 z-10 border-b border-line bg-surface/95 text-xs uppercase text-muted backdrop-blur-sm">
               <tr>
-                <th className="px-4 py-2 font-medium">clienteId</th>
+                <th className="px-4 py-2 font-medium">{isAgricultura ? 'datoId' : 'clienteId'}</th>
                 <th className="px-4 py-2 font-medium">nombre</th>
-                <th className="px-4 py-2 font-medium">documento</th>
+                <th className="px-4 py-2 font-medium">{isAgricultura ? 'código' : 'documento'}</th>
                 <th className="px-4 py-2 font-medium">estado</th>
                 <th className="px-4 py-2 text-right font-medium">acciones</th>
               </tr>
@@ -96,19 +101,27 @@ export default function ClientesRegistradosPage() {
                     {r.tipoDocumento} {r.numeroDocumento}
                   </td>
                   <td className="px-4 py-2">
-                    <ClienteLedgerEstadoBadge c={r} />
+                    <ClienteLedgerEstadoBadge c={r} raw={isAgricultura} />
                   </td>
                   <td className="px-4 py-2 text-right text-xs">
                     <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
-                      <Link className="text-accent hover:underline" to="/consultas" state={{ clienteId: r.clienteId }}>
-                        Detalle
-                      </Link>
-                      <Link
-                        className="text-muted hover:text-accent hover:underline"
-                        to={`/historial-cliente/${encodeURIComponent(r.clienteId)}`}
-                      >
-                        Historial
-                      </Link>
+                      {isAgricultura ? (
+                        <Link className="text-accent hover:underline" to="/auditoria" state={{ recursoId: r.clienteId }}>
+                          Auditar
+                        </Link>
+                      ) : (
+                        <>
+                          <Link className="text-accent hover:underline" to="/consultas" state={{ clienteId: r.clienteId }}>
+                            Detalle
+                          </Link>
+                          <Link
+                            className="text-muted hover:text-accent hover:underline"
+                            to={`/historial-cliente/${encodeURIComponent(r.clienteId)}`}
+                          >
+                            Historial
+                          </Link>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

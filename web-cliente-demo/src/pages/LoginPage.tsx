@@ -47,7 +47,7 @@ export default function LoginPage() {
           <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">CampusChain</p>
           <h1 className="mt-1 text-2xl font-semibold text-slate-100">Consola del puente</h1>
           <p className="mt-2 text-sm text-muted">
-            Iniciar sesión para acceder al panel de auditoría y gestión del tenant.
+            Iniciar sesión para acceder al panel de auditoría de tu organización.
           </p>
         </div>
         <form

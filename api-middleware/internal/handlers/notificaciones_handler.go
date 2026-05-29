@@ -86,3 +86,21 @@ func HistorialNotificacionesAdmin(c *gin.Context) {
 		"items":  items,
 	})
 }
+
+// PurgarNotificacionesAdmin (DELETE /admin/notificaciones)
+// Limpia el histórico en memoria de notificaciones del tenant del solicitante,
+// para que los avisos no permanezcan indefinidamente en el centro de avisos.
+func PurgarNotificacionesAdmin(c *gin.Context) {
+	if notificador.Default == nil || notificador.Default.BrokerSSE() == nil {
+		c.JSON(http.StatusOK, gin.H{"ok": true, "tenant": "", "eliminadas": 0})
+		return
+	}
+	tenant := middleware.TenantFromContext(c)
+	eliminadas := notificador.Default.BrokerSSE().PurgarPorTenant(tenant)
+	c.JSON(http.StatusOK, gin.H{
+		"ok":         true,
+		"tenant":     tenant,
+		"eliminadas": eliminadas,
+		"mensaje":    "Histórico de avisos limpiado para el tenant.",
+	})
+}

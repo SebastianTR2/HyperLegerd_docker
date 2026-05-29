@@ -1,5 +1,5 @@
-import { Fragment, useCallback, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { useSettings } from '../context/SettingsContext'
 import { describeApiError } from '../lib/apiErrorMessage'
 import { formatDemoDateTime } from '../lib/format'
@@ -11,6 +11,9 @@ import {
   type HistorialFilaVista,
   type LineaTiempoRespuesta,
 } from '../services/apiHistorialCliente'
+import { fetchHistorialDato } from '../services/apiDatos'
+import { parseDatoDatos } from '../lib/datoApiAdapter'
+import LoteProcesoPanel, { extraerPayloadLote } from '../components/LoteProcesoPanel'
 import { parseClienteDatos } from '../lib/apiClienteAdapter'
 import { clienteFilasLegibles, displayClienteField } from '../lib/clienteDisplay'
 import { decodeIfBase64 } from '../lib/ledgerFieldDecode'
@@ -100,12 +103,28 @@ function obtenerCambios(viejo: any, nuevo: any) {
   return cambios
 }
 
-function filasDesdeDatos(d: AuditoriaCombinadaDatos): FilaTabla[] {
+function filasDesdeDatos(d: AuditoriaCombinadaDatos, tenant: string): FilaTabla[] {
   const out: FilaTabla[] = []
   let n = 0
+  const isAgricultura = tenant.trim().toLowerCase() === 'agricultura'
 
   // Procesamos ÚNICAMENTE eventos del Ledger (Blockchain)
   for (const ev of d.eventosCadena) {
+    const payloadObj =
+      ev.payload && typeof ev.payload === 'object' ? (ev.payload as Record<string, unknown>) : null
+    const looksLikeDato =
+      !!payloadObj &&
+      (typeof payloadObj.datoId === 'string' ||
+        (payloadObj.payload &&
+          typeof payloadObj.payload === 'object' &&
+          typeof (payloadObj.payload as Record<string, unknown>).codigo_trazabilidad === 'string'))
+    const looksLikeCliente =
+      !!payloadObj &&
+      (typeof payloadObj.clienteId === 'string' ||
+        typeof payloadObj.numeroDocumento === 'string' ||
+        typeof payloadObj.tipoDocumento === 'string')
+    if (isAgricultura && !looksLikeDato) continue
+    if (!isAgricultura && !looksLikeCliente) continue
     n++
     let fullObj: any = {}
     let codigo = '—'
@@ -123,9 +142,18 @@ function filasDesdeDatos(d: AuditoriaCombinadaDatos): FilaTabla[] {
           nombre = parsed.nombre
           estado = parsed.estado
         } else {
-          codigo = str(fullObj.clientId || fullObj.clienteId || fullObj.id || fullObj.codigo || '—')
-          nombre = str(fullObj.nombre || fullObj.Nombre || fullObj.name || '—')
-          estado = str(fullObj.estado || fullObj.Estado || fullObj.status || '—')
+          const payload = fullObj.payload && typeof fullObj.payload === 'object' ? fullObj.payload : null
+          codigo = str(
+            fullObj.datoId ||
+              fullObj.clientId ||
+              fullObj.clienteId ||
+              fullObj.id ||
+              fullObj.codigo ||
+              (payload && (payload.codigo_trazabilidad || payload.datoId)) ||
+              '—',
+          )
+          nombre = str((payload && payload.nombre) || fullObj.nombre || fullObj.Nombre || fullObj.name || codigo || '—')
+          estado = str((payload && payload.estado) || fullObj.estado || fullObj.Estado || fullObj.status || '—')
         }
       }
     } catch (err) {
@@ -184,8 +212,16 @@ function toYmdUtc(d: Date): string {
   return d.toISOString().slice(0, 10)
 }
 
+/** Estado al llegar desde Centro de avisos → Ver detalles. */
+export type AuditarLocationState = {
+  recursoId?: string
+  txId?: string
+}
+
 export default function AuditarPage() {
-  const { mode, apiKey } = useSettings()
+  const location = useLocation()
+  const { mode, apiKey, tenant } = useSettings()
+  const isAgricultura = tenant.trim().toLowerCase() === 'agricultura'
   const puedeConsultarApi = mode === 'api' && apiKey.trim().length > 0
   const [limite, setLimite] = useState(150)
   const [desdeDia, setDesdeDia] = useState('')
@@ -199,33 +235,78 @@ export default function AuditarPage() {
   // --- Estado para Línea de Tiempo por Registro ---
   const [lineaTiempo, setLineaTiempo] = useState<LineaTiempoRespuesta | null>(null)
   const [historialOps, setHistorialOps] = useState<HistorialFilaVista[]>([])
+  const [lotePayloadsLT, setLotePayloadsLT] = useState<Array<Record<string, unknown> | null>>([])
   const [lineaLoading, setLineaLoading] = useState(false)
   const [lineaError, setLineaError] = useState<string | null>(null)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [selectedAccionIdx, setSelectedAccionIdx] = useState<number | null>(null)
   const [selectedUsuario, setSelectedUsuario] = useState<string | null>(null)
 
-  const buscarLineaTiempo = useCallback(async () => {
-    const id = busquedaId.trim()
+  const buscarLineaTiempo = useCallback(async (idOverride?: string) => {
+    const id = (idOverride ?? busquedaId).trim()
     if (!id) return
+    if (idOverride) setBusquedaId(id)
     setLineaLoading(true)
     setLineaError(null)
     setLineaTiempo(null)
     setHistorialOps([])
+    setLotePayloadsLT([])
     setSelectedAccionIdx(null)
     try {
-      const [lt, hist] = await Promise.all([
-        fetchLineaTiempoCliente(id),
-        fetchHistorialCliente(id),
-      ])
-      setLineaTiempo(lt)
-      setHistorialOps(operacionesAVista(hist))
+      if (isAgricultura) {
+        const hist = await fetchHistorialDato(id)
+        const raw = Array.isArray(hist.datos) ? hist.datos : []
+        const combinado = raw
+          .map((op: any) => {
+            const rec = parseDatoDatos(op?.record)
+            return {
+              fila: {
+                txId: String(op?.txId ?? ''),
+                timestamp: String(op?.timestamp ?? ''),
+                isDelete: Boolean(op?.isDelete),
+                resumen: rec ? `${rec.nombre} (${rec.estado})` : op?.isDelete ? 'Baja / borrado lógico' : 'Sin registro',
+                cliente: rec,
+              } satisfies HistorialFilaVista,
+              payload: extraerPayloadLote(op?.record),
+            }
+          })
+          .filter((x) => x.fila.txId)
+          .sort((a, b) => new Date(a.fila.timestamp).getTime() - new Date(b.fila.timestamp).getTime())
+        const ops: HistorialFilaVista[] = combinado.map((x) => x.fila)
+
+        const acciones = ops.map((op, idx) => ({
+          tipo: idx === 0 ? ('creado' as const) : op.isDelete ? ('baja' as const) : ('editado' as const),
+          etiqueta: idx === 0 ? 'Creado' : op.isDelete ? 'Baja' : `Edición #${idx}`,
+          fecha: op.timestamp,
+          txId: op.txId,
+        }))
+        setLineaTiempo({ ok: true, clienteId: id, acciones })
+        setHistorialOps(ops)
+        setLotePayloadsLT(combinado.map((x) => x.payload))
+      } else {
+        const [lt, hist] = await Promise.all([fetchLineaTiempoCliente(id), fetchHistorialCliente(id)])
+        setLineaTiempo(lt)
+        setHistorialOps(operacionesAVista(hist))
+        setLotePayloadsLT([])
+      }
     } catch (e) {
       setLineaError(describeApiError(e))
     } finally {
       setLineaLoading(false)
     }
-  }, [busquedaId])
+  }, [busquedaId, isAgricultura])
+
+  const navegacionProcesada = useRef<string | null>(null)
+  useEffect(() => {
+    const st = location.state as AuditarLocationState | null
+    const id = st?.recursoId?.trim()
+    if (!id || !puedeConsultarApi) return
+    const clave = `${location.key}:${id}`
+    if (navegacionProcesada.current === clave) return
+    navegacionProcesada.current = clave
+    if (st?.txId?.trim()) setBusquedaTxId(st.txId.trim())
+    void buscarLineaTiempo(id)
+  }, [location.key, location.state, puedeConsultarApi, buscarLineaTiempo])
 
   const load = useCallback(async () => {
     if (!puedeConsultarApi) {
@@ -247,7 +328,7 @@ export default function AuditarPage() {
   }, [limite, desdeDia, hastaDia, puedeConsultarApi])
 
   const filas = useMemo(() => {
-    let list = datos ? filasDesdeDatos(datos) : []
+    let list = datos ? filasDesdeDatos(datos, tenant) : []
     // Excluir entidades del legado "borradores" (claves _DRAFT y _REV_N).
     list = list.filter((r) => {
       const c = (r.codigo || '').toUpperCase()
@@ -262,7 +343,7 @@ export default function AuditarPage() {
       list = list.filter(r => r.firma.toLowerCase().includes(q))
     }
     return list
-  }, [datos, busquedaId, busquedaTxId])
+  }, [datos, busquedaId, busquedaTxId, tenant])
 
   // Agrupación: 1 fila por clienteId. Cada grupo recuerda en qué índices
   // del array plano `filas` están sus eventos para poder reabrir el modal
@@ -353,7 +434,7 @@ export default function AuditarPage() {
       <div>
         <h1 className="text-lg font-semibold text-slate-100">Auditar</h1>
         <p className="mt-1 text-sm text-muted">
-          Bitácora del puente HTTP más eventos del ledger. Busca por ID de registro para ver su línea de tiempo completa.
+          Bitácora del puente HTTP más eventos del ledger. Busca por ID para ver la línea de tiempo completa.
         </p>
       </div>
 
@@ -421,7 +502,7 @@ export default function AuditarPage() {
             <input
               type="text"
               className={`${input} mt-1 border-accent/40 focus:border-accent`}
-              placeholder="Ej: CLI100"
+              placeholder={isAgricultura ? 'Ej: AGRO-TEST-001' : 'Ej: CLI100'}
               value={busquedaId}
               onChange={(e) => {
                 setBusquedaId(e.target.value)
@@ -686,6 +767,15 @@ export default function AuditarPage() {
 
                   {/* Attributes Comparison Table */}
                   <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                    {isAgricultura && lotePayloadsLT[selectedAccionIdx] ? (
+                      <div className="mb-4 rounded-xl border border-line/60 bg-surface/20 p-4">
+                        <LoteProcesoPanel
+                          datos={lotePayloadsLT[selectedAccionIdx]}
+                          titulo="Proceso del lote en esta revisión"
+                          compacto
+                        />
+                      </div>
+                    ) : null}
                     <table className="w-full text-left text-xs">
                       <thead>
                         <tr className="border-b border-line text-[10px] uppercase text-muted">
@@ -760,7 +850,7 @@ export default function AuditarPage() {
 
       {datos ? (
         <p className="text-xs text-muted">
-          HTTP: {datos.totalHttp} filas · Eventos cadena: {datos.totalEventos} · Clientes con actividad: {grupos.length}
+          HTTP: {datos.totalHttp} filas · Eventos cadena: {datos.totalEventos} · Registros con actividad: {grupos.length}
         </p>
       ) : null}
 
@@ -941,6 +1031,11 @@ export default function AuditarPage() {
 
               <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                 <div className="space-y-4">
+                  {isAgricultura && extraerPayloadLote(row.cliente) ? (
+                    <div className="rounded-xl border border-line/60 bg-surface/20 p-4">
+                      <LoteProcesoPanel datos={row.cliente} titulo="Proceso del lote en esta transacción" />
+                    </div>
+                  ) : null}
                   <div className="overflow-hidden rounded-xl border border-line bg-surface/20">
                     <table className="w-full text-left text-xs">
                       <thead className="bg-surface/40 text-[10px] uppercase text-muted">

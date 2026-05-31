@@ -221,7 +221,8 @@ export type AuditarLocationState = {
 export default function AuditarPage() {
   const location = useLocation()
   const { mode, apiKey, tenant } = useSettings()
-  const isAgricultura = tenant.trim().toLowerCase() === 'agricultura'
+  const tenantId = (tenant ?? '').trim().toLowerCase()
+  const isAgricultura = tenantId === 'agricultura'
   const puedeConsultarApi = mode === 'api' && apiKey.trim().length > 0
   const [limite, setLimite] = useState(150)
   const [desdeDia, setDesdeDia] = useState('')
@@ -328,7 +329,7 @@ export default function AuditarPage() {
   }, [limite, desdeDia, hastaDia, puedeConsultarApi])
 
   const filas = useMemo(() => {
-    let list = datos ? filasDesdeDatos(datos, tenant) : []
+    let list = datos ? filasDesdeDatos(datos, tenantId) : []
     // Excluir entidades del legado "borradores" (claves _DRAFT y _REV_N).
     list = list.filter((r) => {
       const c = (r.codigo || '').toUpperCase()
@@ -343,7 +344,7 @@ export default function AuditarPage() {
       list = list.filter(r => r.firma.toLowerCase().includes(q))
     }
     return list
-  }, [datos, busquedaId, busquedaTxId, tenant])
+  }, [datos, busquedaId, busquedaTxId, tenantId])
 
   // Agrupación: 1 fila por clienteId. Cada grupo recuerda en qué índices
   // del array plano `filas` están sus eventos para poder reabrir el modal
@@ -611,7 +612,7 @@ export default function AuditarPage() {
                               : 'border-sky-500/30 bg-sky-500/5'
                         }`}
                       >
-                        <span className="absolute -top-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full bg-slate-700 text-[9px] font-bold text-ink-secondary ring-1 ring-slate-600">
+                        <span className="absolute -top-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full bg-accent/15 text-[9px] font-bold text-accent ring-1 ring-accent/30">
                           {i + 1}
                         </span>
                         <div className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-sm ${
@@ -655,11 +656,11 @@ export default function AuditarPage() {
             onClick={() => setSelectedAccionIdx(null)}
           >
             <div
-              className="w-full max-w-5xl h-[85vh] rounded-md border border-line bg-surface shadow-card-md animate-in zoom-in-95 duration-200 flex flex-col overflow-hidden"
+              className="w-full max-w-5xl h-[85vh] rounded-2xl border border-line bg-surface shadow-card-md animate-in zoom-in-95 duration-200 flex flex-col overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Top Navbar */}
-              <div className="flex items-center justify-between border-b border-line bg-[#16192b] px-6 py-4">
+              <div className="flex items-center justify-between border-b border-line bg-gray-50 px-6 py-4">
                 <div>
                   <h2 className="text-sm font-bold text-ink flex items-center gap-2">
                     <span className="flex h-5 w-5 items-center justify-center rounded bg-sky-500/20 text-xs text-sky-400 font-sans">✎</span>
@@ -669,7 +670,7 @@ export default function AuditarPage() {
                 </div>
                 <button
                   onClick={() => setSelectedAccionIdx(null)}
-                  className="rounded-lg bg-gray-50 border border-line px-3.5 py-1.5 text-xs text-muted hover:text-ink-secondary transition-colors"
+                  className="admin-btn-secondary !rounded-lg !px-3.5 !py-1.5 !text-xs"
                 >
                   Cerrar
                 </button>
@@ -678,7 +679,7 @@ export default function AuditarPage() {
               {/* Main Content Area: Split View */}
               <div className="flex flex-1 min-h-0 divide-x divide-line/30">
                 {/* Left Column: Revisions Sidebar (vertical timeline) */}
-                <div className="w-1/3 bg-[#16192b]/35 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                <div className="w-1/3 bg-gray-50 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted px-1">Línea de Tiempo del Registro</p>
                   
                   <div className="space-y-2">
@@ -737,9 +738,9 @@ export default function AuditarPage() {
                 </div>
 
                 {/* Right Column: Comparative attributes view */}
-                <div className="w-2/3 flex flex-col bg-[#121420] overflow-hidden">
+                <div className="w-2/3 flex flex-col bg-surface overflow-hidden">
                   {/* Action Details Header */}
-                  <div className="bg-[#16192b]/20 border-b border-line/30 p-4">
+                  <div className="bg-gray-50 border-b border-line/30 p-4">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-400/80">Detalle de la Modificación</p>
                     <h3 className="text-xs font-bold text-ink mt-1 flex items-center gap-1.5">
                       {selectedAcc.tipo === 'creado' ? (
@@ -829,7 +830,7 @@ export default function AuditarPage() {
                   </div>
 
                   {/* Table Legend */}
-                  <div className="flex items-center justify-start border-t border-line px-6 py-3 bg-[#16192b]/10">
+                  <div className="flex items-center justify-start border-t border-line px-6 py-3 bg-gray-50">
                     <div className="flex items-center gap-4 text-[10px] text-muted">
                       <div className="flex items-center gap-1.5">
                         <div className="h-2 w-2 rounded-full bg-rose-500/60"></div>

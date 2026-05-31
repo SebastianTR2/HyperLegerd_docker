@@ -814,6 +814,382 @@ paths:
               schema:
                 $ref: '#/components/schemas/RespuestaError'
 
+  /datos:
+    get:
+      security:
+        - ApiKeyAuth: []
+      tags: [chaincode]
+      summary: Listar datos genéricos del tenant
+      description: >-
+        Consulta `GetAllDatos` sobre `dato_cc` usando el tenant deducido por `X-API-Key`.
+        Disponible para cualquier rol del tenant.
+      responses:
+        '200':
+          description: Listado obtenido correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaLectura'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+    post:
+      security:
+        - ApiKeyAuth: []
+      tags: [chaincode]
+      summary: Crear dato genérico en blockchain
+      description: >-
+        Invoca `CreateDato` en `dato_cc` del tenant actual.
+        Requiere rol integrador o admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [datoId, tipo, payload]
+              properties:
+                datoId:
+                  type: string
+                  minLength: 1
+                  example: AGRO-TEST-001
+                tipo:
+                  type: string
+                  minLength: 1
+                  example: lote
+                payload:
+                  description: JSON libre de negocio.
+                  oneOf:
+                    - type: object
+                    - type: array
+                      items: { type: object }
+      responses:
+        '201':
+          description: Dato registrado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaExitoTx'
+        '400':
+          description: Error de validación o JSON inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso (solo integrador o admin)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '409':
+          description: datoId ya existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
+  /datos/{datoId}:
+    get:
+      security:
+        - ApiKeyAuth: []
+      tags: [chaincode]
+      summary: Consultar dato por ID
+      parameters:
+        - name: datoId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Dato consultado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaLectura'
+        '400':
+          description: datoId inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '404':
+          description: Dato no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+    put:
+      security:
+        - ApiKeyAuth: []
+      tags: [chaincode]
+      summary: Actualizar dato genérico
+      description: >-
+        Invoca `UpdateDato` en `dato_cc` del tenant actual.
+        Requiere rol integrador o admin.
+      parameters:
+        - name: datoId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tipo, payload]
+              properties:
+                datoId:
+                  type: string
+                  description: Debe coincidir con el datoId del path (si se envía).
+                tipo:
+                  type: string
+                  minLength: 1
+                payload:
+                  oneOf:
+                    - type: object
+                    - type: array
+                      items: { type: object }
+      responses:
+        '200':
+          description: Dato actualizado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaExitoTx'
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '404':
+          description: Dato no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+    delete:
+      security:
+        - ApiKeyAuth: []
+      tags: [chaincode]
+      summary: Eliminar dato del world state
+      description: Invoca `DeleteDato`. Solo rol admin.
+      parameters:
+        - name: datoId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Dato eliminado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaExitoTx'
+        '400':
+          description: datoId inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso (solo admin)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '404':
+          description: Dato no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
+  /datos/{datoId}/historial:
+    get:
+      security:
+        - ApiKeyAuth: []
+      tags: [chaincode]
+      summary: Historial inmutable de un dato
+      description: Consulta `GetDatoHistory` de `dato_cc`.
+      parameters:
+        - name: datoId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Historial consultado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaLectura'
+        '400':
+          description: datoId inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '404':
+          description: Dato no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
+  /admin/notificaciones:
+    get:
+      security:
+        - ApiKeyAuth: []
+      tags: [auditoria]
+      summary: Historial de notificaciones admin por tenant
+      description: Devuelve notificaciones recientes del tenant del solicitante.
+      responses:
+        '200':
+          description: Historial de notificaciones
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  tenant: { type: string }
+                  total: { type: integer }
+                  items:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso (solo admin)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+    delete:
+      security:
+        - ApiKeyAuth: []
+      tags: [auditoria]
+      summary: Limpiar historial de notificaciones del tenant
+      responses:
+        '200':
+          description: Historial limpiado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  tenant: { type: string }
+                  eliminadas: { type: integer }
+                  mensaje: { type: string }
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso (solo admin)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
+  /admin/notificaciones/stream:
+    get:
+      security:
+        - ApiKeyAuth: []
+      tags: [auditoria]
+      summary: Stream SSE de notificaciones admin del tenant
+      responses:
+        '200':
+          description: Flujo continuo text/event-stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso (solo admin)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
   /tokens/cuentas:
     get:
       security:

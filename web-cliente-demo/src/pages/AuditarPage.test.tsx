@@ -28,6 +28,7 @@ describe("AuditarPage", () => {
     useSettingsMock.mockReturnValue({
       mode: "api",
       apiKey: "jwt",
+      tenant: "clientes",
     } as never);
 
     fetchAuditoriaCombinadaMock.mockResolvedValue({

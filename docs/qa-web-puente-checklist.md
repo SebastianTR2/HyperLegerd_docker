@@ -14,17 +14,25 @@ Estado por caso:
 
 ### 1.1 Compilación frontend
 
-- [ ] En `web-cliente-demo`, `npm run build` termina sin errores.
+- [x] En `web-cliente-demo`, `npm run build` termina sin errores.
 
 ### 1.2 Pruebas BFF
 
-- [ ] En `web-portal-api`, `go test ./...` termina en verde.
+- [x] En `web-portal-api`, `go test ./...` termina en verde.
 
 ### 1.3 Pruebas middleware
 
-- [ ] En `api-middleware`, `go test ./...` termina en verde.
+- [x] En `api-middleware`, `go test ./...` termina en verde.
 
 Criterio de salida Fase 1: 3/3 aprobados.
+
+Evidencia (2026-05-31):
+
+- `web-cliente-demo`: `npm run build` ✅
+- `web-cliente-demo`: `npm test` ✅ (12 tests / 6 files)
+- `web-portal-api`: `go test ./...` ✅
+- `api-middleware`: `go test ./...` ✅
+- `api-middleware`: `go build ./...` ✅
 
 ---
 

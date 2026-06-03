@@ -127,6 +127,21 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
   const [clientesLedgerAccessDenied, setClientesLedgerAccessDenied] = useState(false)
   const [traces, setTraces] = useState<TraceEntry[]>(() => loadTraceEntries())
   const [toasts, setToasts] = useState<ToastItem[]>([])
+  const tenantActivoRef = useRef((tenant ?? '').trim().toLowerCase())
+
+  // Evita mezclar actividad local entre tenants (clientes/agricultura).
+  // La "Actividad reciente" es estado del navegador, no del ledger.
+  useEffect(() => {
+    const actual = (tenant ?? '').trim().toLowerCase()
+    const previo = tenantActivoRef.current
+    if (previo !== actual) {
+      tenantActivoRef.current = actual
+      setEventos([])
+      setTokenOps([])
+      setApiClienteRows([])
+      setTraces([])
+    }
+  }, [tenant])
 
   const refreshClientesLedger = useCallback(async () => {
     setClientesLedgerLoading(true)
@@ -157,8 +172,16 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       setClientesLedgerAccessDenied(true)
       return
     }
+    // Evita consultas prematuras con tenant vacío durante el bootstrap de sesión.
+    // Si aún no llegó el perfil (tenant), no intentamos /clientes por defecto.
+    if (!tenant.trim()) {
+      setClientesLedger([])
+      setClientesLedgerError(null)
+      setClientesLedgerAccessDenied(false)
+      return
+    }
     void refreshClientesLedger()
-  }, [refreshClientesLedger, mode, apiKey])
+  }, [refreshClientesLedger, mode, apiKey, tenant])
 
   useEffect(() => {
     saveDemoState({ version: 2, registros, eventos, tokenOps })

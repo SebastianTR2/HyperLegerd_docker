@@ -78,6 +78,48 @@ function str(v: unknown): string {
   return String(v)
 }
 
+function asRecord(v: unknown): Record<string, unknown> {
+  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
+}
+
+function valorComparable(v: unknown): string {
+  if (v === null || v === undefined || v === '') return ''
+  if (typeof v === 'object') {
+    try {
+      return JSON.stringify(v)
+    } catch {
+      return String(v)
+    }
+  }
+  return String(v)
+}
+
+function valorGenericoLegible(v: unknown): string {
+  if (v === null || v === undefined || v === '') return '(vacío)'
+  if (typeof v === 'object') {
+    try {
+      const txt = JSON.stringify(v)
+      return txt.length > 180 ? `${txt.slice(0, 180)}…` : txt
+    } catch {
+      return String(v)
+    }
+  }
+  return String(v)
+}
+
+function etiquetaCampo(campo: string, isAgricultura: boolean): string {
+  if (!isAgricultura) return campo
+  if (campo === 'clienteId' || campo === 'datoId' || campo === 'codigo_trazabilidad') return 'id'
+  return campo
+}
+
+function datosComparablesRevision(raw: unknown, isAgricultura: boolean): Record<string, unknown> {
+  const origen = isAgricultura ? (extraerPayloadLote(raw) ?? asRecord(raw)) : asRecord(raw)
+  if (!isAgricultura) return origen
+  const omitidos = new Set(['actividades', 'producciones', 'notas', 'notasLedger'])
+  return Object.fromEntries(Object.entries(origen).filter(([k]) => !omitidos.has(k)))
+}
+
 /** Color del indicador en tabla según rol mostrado en «Autor / Rol». */
 function colorIndicadorAutor(autor: string): string {
   const a = autor.toLowerCase()
@@ -266,7 +308,9 @@ export default function AuditarPage() {
                 timestamp: String(op?.timestamp ?? ''),
                 isDelete: Boolean(op?.isDelete),
                 resumen: rec ? `${rec.nombre} (${rec.estado})` : op?.isDelete ? 'Baja / borrado lógico' : 'Sin registro',
-                cliente: rec,
+                // En agricultura conservamos el record crudo para evitar acoplar UI
+                // a campos legacy de "cliente" (tipoDocumento, numeroDocumento, etc.).
+                cliente: op?.record,
               } satisfies HistorialFilaVista,
               payload: extraerPayloadLote(op?.record),
             }
@@ -646,7 +690,11 @@ export default function AuditarPage() {
         const selectedAcc = lineaTiempo.acciones[selectedAccionIdx]
         const opActual = historialOps[selectedAccionIdx]
         const opAnterior = selectedAccionIdx > 0 ? historialOps[selectedAccionIdx - 1] : null
-        const campos = clienteFilasLegibles(opActual?.cliente).map((r) => r.key)
+        const actualComparable = datosComparablesRevision(opActual?.cliente, isAgricultura)
+        const anteriorComparable = datosComparablesRevision(opAnterior?.cliente, isAgricultura)
+        const campos = isAgricultura
+          ? Array.from(new Set([...Object.keys(anteriorComparable), ...Object.keys(actualComparable)]))
+          : clienteFilasLegibles(opActual?.cliente).map((r) => r.key)
 
         const selectedAutor = autorRolDisplayDesdeNotas(opActual?.cliente ?? undefined)
 
@@ -793,18 +841,23 @@ export default function AuditarPage() {
                           </tr>
                         ) : (
                           campos.map((campo) => {
-                            const valActual = opActual?.cliente?.[campo]
-                            const valAnterior = opAnterior?.cliente?.[campo]
-                            
-                            const actualStr = displayClienteField(campo, valActual)
-                            const anteriorStr = displayClienteField(campo, valAnterior)
-                            
-                            const cambió = opAnterior !== null && String(valAnterior ?? '') !== String(valActual ?? '')
+                            const valActual = isAgricultura ? actualComparable[campo] : opActual?.cliente?.[campo]
+                            const valAnterior = isAgricultura ? anteriorComparable[campo] : opAnterior?.cliente?.[campo]
+
+                            const actualStr = isAgricultura
+                              ? valorGenericoLegible(valActual)
+                              : displayClienteField(campo, valActual)
+                            const anteriorStr = isAgricultura
+                              ? valorGenericoLegible(valAnterior)
+                              : displayClienteField(campo, valAnterior)
+
+                            const cambió =
+                              opAnterior !== null && valorComparable(valAnterior) !== valorComparable(valActual)
 
                             return (
                               <tr key={campo} className={`transition-colors ${cambió ? 'bg-sky-500/5 hover:bg-sky-500/10' : 'hover:bg-surface/20'}`}>
                                 <td className={`py-3 font-semibold ${cambió ? 'text-sky-400' : 'text-muted'}`}>
-                                  {campo}
+                                  {etiquetaCampo(campo, isAgricultura)}
                                 </td>
                                 <td className="py-3">
                                   {cambió ? (
@@ -1015,7 +1068,11 @@ export default function AuditarPage() {
         const rowAnterior = indexAnterior !== -1 ? filas[indexAnterior] : null
 
         const cambios = obtenerCambios(rowAnterior?.cliente, row.cliente)
-        const campos = Object.keys(row.cliente || {})
+        const actualComparable = datosComparablesRevision(row.cliente, isAgricultura)
+        const anteriorComparable = datosComparablesRevision(rowAnterior?.cliente, isAgricultura)
+        const campos = isAgricultura
+          ? Array.from(new Set([...Object.keys(anteriorComparable), ...Object.keys(actualComparable)]))
+          : Object.keys(row.cliente || {})
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
@@ -1047,23 +1104,35 @@ export default function AuditarPage() {
                       </thead>
                       <tbody className="divide-y divide-line">
                         {campos.map((campo) => {
-                          const cambio = cambios[campo]
+                          const cambio = isAgricultura
+                            ? {
+                                anterior: anteriorComparable[campo],
+                                nuevo: actualComparable[campo],
+                              }
+                            : cambios[campo]
+                          const huboCambio = isAgricultura
+                            ? valorComparable(anteriorComparable[campo]) !== valorComparable(actualComparable[campo])
+                            : Boolean(cambio)
                           return (
                             <tr key={campo} className="hover:bg-white/[0.02]">
-                              <td className="px-4 py-2.5 font-medium text-muted">{campo}</td>
+                              <td className="px-4 py-2.5 font-medium text-muted">{etiquetaCampo(campo, isAgricultura)}</td>
                               <td className="px-4 py-2.5">
-                                {cambio ? (
+                                {huboCambio ? (
                                   <div className="flex flex-wrap items-center gap-2">
                                     <span className="rounded bg-rose-500/10 px-1.5 py-0.5 text-rose-400 line-through decoration-rose-500/50">
-                                      {str(cambio.anterior) || '(vacío)'}
+                                      {valorGenericoLegible(cambio.anterior)}
                                     </span>
                                     <span className="text-muted">→</span>
                                     <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-400 font-semibold">
-                                      {str(cambio.nuevo) || '(vacío)'}
+                                      {valorGenericoLegible(cambio.nuevo)}
                                     </span>
                                   </div>
                                 ) : (
-                                  <span className="text-ink-secondary font-mono">{str(row.cliente[campo]) || '(vacío)'}</span>
+                                  <span className="text-ink-secondary font-mono">
+                                    {isAgricultura
+                                      ? valorGenericoLegible(actualComparable[campo])
+                                      : valorGenericoLegible(row.cliente[campo])}
+                                  </span>
                                 )}
                               </td>
                             </tr>

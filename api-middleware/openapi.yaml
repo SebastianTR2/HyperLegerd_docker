@@ -1100,6 +1100,70 @@ paths:
               schema:
                 $ref: '#/components/schemas/RespuestaError'
 
+  /datos/{datoId}/restaurar:
+    post:
+      security:
+        - ApiKeyAuth: []
+      tags: [chaincode]
+      summary: Restaurar una revisión histórica como nuevo bloque
+      description: >-
+        Endpoint de rollback lógico (inmutable): toma una revisión histórica por `txId`
+        y la vuelve a escribir en el world state como una NUEVA transacción.
+        Solo rol admin.
+      parameters:
+        - name: datoId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [txId]
+              properties:
+                txId:
+                  type: string
+                  description: TxID de la revisión histórica que se desea restaurar.
+      responses:
+        '200':
+          description: Restauración aplicada como nueva revisión
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  txId: { type: string }
+                  mensaje: { type: string }
+                  restauradoDesdeTxId: { type: string }
+        '400':
+          description: Error de validación o revisión no restaurable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '401':
+          description: Falta la cabecera X-API-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '403':
+          description: API key inválida o rol sin permiso (solo admin)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+        '404':
+          description: Revisión (txId) no encontrada para el dato
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaError'
+
   /admin/notificaciones:
     get:
       security:

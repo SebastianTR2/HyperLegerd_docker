@@ -38,23 +38,24 @@ const (
 	EventoDatoCreado        = "dato.creado"
 	EventoDatoEditado       = "dato.editado"
 	EventoDatoEliminado     = "dato.eliminado"
+	EventoDatoRestaurado    = "dato.restaurado"
 )
 
 // EventoNotificacion representa un cambio detectado que debe avisarse a los
 // administradores configurados. Se publica desde los hooks de los handlers
 // HTTP, justo después de un Submit exitoso al ledger.
 type EventoNotificacion struct {
-	ID         string         `json:"id"`
-	Timestamp  time.Time      `json:"timestamp"`
-	Tenant     string         `json:"tenant"`
-	Tipo       string         `json:"tipo"`
-	Recurso    string         `json:"recurso,omitempty"`
-	ActorRol   string         `json:"actorRol,omitempty"`
-	ActorID    string         `json:"actorId,omitempty"`
-	ActorNombre string        `json:"actorNombre,omitempty"`
-	TxID       string         `json:"txId,omitempty"`
-	Resumen    string         `json:"resumen"`
-	Metadata   map[string]any `json:"metadata,omitempty"`
+	ID          string         `json:"id"`
+	Timestamp   time.Time      `json:"timestamp"`
+	Tenant      string         `json:"tenant"`
+	Tipo        string         `json:"tipo"`
+	Recurso     string         `json:"recurso,omitempty"`
+	ActorRol    string         `json:"actorRol,omitempty"`
+	ActorID     string         `json:"actorId,omitempty"`
+	ActorNombre string         `json:"actorNombre,omitempty"`
+	TxID        string         `json:"txId,omitempty"`
+	Resumen     string         `json:"resumen"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
 }
 
 // CanalSalida es la abstracción que implementan email/webhook/sse.

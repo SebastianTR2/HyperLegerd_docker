@@ -37,6 +37,17 @@ type entradaDato struct {
 	Payload json.RawMessage `json:"payload"`
 }
 
+type entradaRestaurarDato struct {
+	TxID string `json:"txId"`
+}
+
+type historialDatoEntry struct {
+	TxID      string          `json:"txId"`
+	Timestamp string          `json:"timestamp"`
+	IsDelete  bool            `json:"isDelete"`
+	Record    json.RawMessage `json:"record"`
+}
+
 func validarEntradaDato(e entradaDato) error {
 	if strings.TrimSpace(e.DatoID) == "" {
 		return errors.New("datoId es obligatorio")
@@ -49,6 +60,19 @@ func validarEntradaDato(e entradaDato) error {
 	}
 	if !json.Valid(e.Payload) {
 		return errors.New("payload no es JSON válido")
+	}
+	return nil
+}
+
+func buscarRevisionHistorial(entries []historialDatoEntry, txID string) *historialDatoEntry {
+	needle := strings.TrimSpace(txID)
+	if needle == "" {
+		return nil
+	}
+	for i := range entries {
+		if strings.TrimSpace(entries[i].TxID) == needle {
+			return &entries[i]
+		}
 	}
 	return nil
 }
@@ -191,6 +215,136 @@ func EliminarDato(c *gin.Context) {
 		Ok:      true,
 		TxId:    res.TxID,
 		Mensaje: "Dato eliminado del ledger",
+	})
+}
+
+// RestaurarDato restaura una revisión histórica como un NUEVO bloque (rollback lógico).
+//
+// Flujo:
+//  1. Lee GetDatoHistory(datoId)
+//  2. Busca la revisión solicitada por txId
+//  3. Toma su record y lo vuelve a escribir con CreateDato/UpdateDato
+//
+// No modifica ni elimina bloques previos: la cadena permanece inmutable.
+func RestaurarDato(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("datoId"))
+	if id == "" {
+		c.JSON(http.StatusBadRequest, models.RespuestaError{Ok: false, Codigo: "VALIDACION", Mensaje: "datoId vacío"})
+		return
+	}
+	var in entradaRestaurarDato
+	if err := c.ShouldBindJSON(&in); err != nil {
+		c.JSON(http.StatusBadRequest, models.RespuestaError{Ok: false, Codigo: "VALIDACION", Mensaje: "JSON inválido: " + err.Error()})
+		return
+	}
+	in.TxID = strings.TrimSpace(in.TxID)
+	if in.TxID == "" {
+		c.JSON(http.StatusBadRequest, models.RespuestaError{Ok: false, Codigo: "VALIDACION", Mensaje: "txId es obligatorio para restaurar"})
+		return
+	}
+
+	tenantID := middleware.TenantFromContext(c)
+	rawHist, err := fabric.EvaluateTransactionTenant(tenantID, "", "", "GetDatoHistory", id)
+	if err != nil {
+		st, cod, pub := clasificarErrorFabric(err)
+		c.JSON(st, models.RespuestaError{Ok: false, Codigo: cod, Mensaje: pub})
+		return
+	}
+
+	var historial []historialDatoEntry
+	if err := json.Unmarshal(rawHist, &historial); err != nil {
+		c.JSON(http.StatusInternalServerError, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "ERROR_FORMATO",
+			Mensaje: "No se pudo interpretar el historial del dato",
+		})
+		return
+	}
+
+	rev := buscarRevisionHistorial(historial, in.TxID)
+	if rev == nil {
+		c.JSON(http.StatusNotFound, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "REVISION_NO_ENCONTRADA",
+			Mensaje: "No existe una revisión con ese txId para este dato",
+		})
+		return
+	}
+	if rev.IsDelete || len(rev.Record) == 0 {
+		c.JSON(http.StatusBadRequest, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "REVISION_NO_RESTAURABLE",
+			Mensaje: "La revisión seleccionada corresponde a una eliminación y no puede restaurarse",
+		})
+		return
+	}
+
+	var dato entradaDato
+	if err := json.Unmarshal(rev.Record, &dato); err != nil {
+		c.JSON(http.StatusInternalServerError, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "ERROR_FORMATO",
+			Mensaje: "El bloque histórico no contiene un dato válido para restaurar",
+		})
+		return
+	}
+	if strings.TrimSpace(dato.DatoID) == "" {
+		dato.DatoID = id
+	}
+	if strings.TrimSpace(dato.DatoID) != id {
+		c.JSON(http.StatusBadRequest, models.RespuestaError{
+			Ok:      false,
+			Codigo:  "VALIDACION",
+			Mensaje: "La revisión seleccionada no pertenece al dato indicado en la ruta",
+		})
+		return
+	}
+	if err := validarEntradaDato(dato); err != nil {
+		c.JSON(http.StatusBadRequest, models.RespuestaError{Ok: false, Codigo: "VALIDACION", Mensaje: "Revisión no restaurable: " + err.Error()})
+		return
+	}
+
+	// Si el registro existe en world-state: Update. Si no existe: Create.
+	_, err = fabric.EvaluateTransactionTenant(tenantID, "", "", "ReadDato", id)
+	existeActual := err == nil
+	if err != nil && !esErrorLedgerNoEncontrado(err) {
+		st, cod, pub := clasificarErrorFabric(err)
+		c.JSON(st, models.RespuestaError{Ok: false, Codigo: cod, Mensaje: pub})
+		return
+	}
+
+	var res *fabric.SubmitResult
+	if existeActual {
+		res, err = fabric.InvokeTransactionWithTxIDTenant(tenantID, "", "", "UpdateDato",
+			id,
+			strings.TrimSpace(dato.Tipo),
+			string(dato.Payload),
+		)
+	} else {
+		res, err = fabric.InvokeTransactionWithTxIDTenant(tenantID, "", "", "CreateDato",
+			id,
+			strings.TrimSpace(dato.Tipo),
+			string(dato.Payload),
+		)
+	}
+	if err != nil {
+		st, cod, pub := clasificarErrorFabric(err)
+		c.JSON(st, models.RespuestaError{Ok: false, Codigo: cod, Mensaje: pub})
+		return
+	}
+
+	publicarNotificacion(c,
+		notificador.EventoDatoRestaurado,
+		id,
+		res.TxID,
+		fmt.Sprintf("Dato %q restaurado desde txId=%s", id, in.TxID),
+	)
+
+	c.JSON(http.StatusOK, gin.H{
+		"ok":                  true,
+		"txId":                res.TxID,
+		"mensaje":             "Dato restaurado correctamente como una nueva revisión",
+		"restauradoDesdeTxId": in.TxID,
 	})
 }
 

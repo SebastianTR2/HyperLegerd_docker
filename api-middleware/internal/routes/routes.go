@@ -73,6 +73,7 @@ func SetupRoutes(router *gin.Engine) {
 	router.PUT("/datos/:datoId", append(authIntegradorOAdmin, handlers.ActualizarDato)...)
 	router.DELETE("/datos/:datoId", append(authSoloAdmin, handlers.EliminarDato)...)
 	router.GET("/datos/:datoId/historial", append(authCualquierRol, handlers.ConsultarHistorialDato)...)
+	router.POST("/datos/:datoId/restaurar", append(authSoloAdmin, handlers.RestaurarDato)...)
 
 	// Invocación controlada por lista blanca (hito 2.5) — integradores (contrato OpenAPI)
 	router.POST("/chaincode/invocar", append(authIntegradorOAdmin, handlers.InvocarChaincodeIntegrador)...)

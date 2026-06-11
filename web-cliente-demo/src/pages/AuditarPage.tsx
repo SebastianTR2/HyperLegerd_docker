@@ -11,7 +11,7 @@ import {
   type HistorialFilaVista,
   type LineaTiempoRespuesta,
 } from '../services/apiHistorialCliente'
-import { fetchHistorialDato } from '../services/apiDatos'
+import { fetchHistorialDato, restaurarDatoRevision } from '../services/apiDatos'
 import { parseDatoDatos } from '../lib/datoApiAdapter'
 import LoteProcesoPanel, { extraerPayloadLote } from '../components/LoteProcesoPanel'
 import { parseClienteDatos } from '../lib/apiClienteAdapter'
@@ -262,7 +262,7 @@ export type AuditarLocationState = {
 
 export default function AuditarPage() {
   const location = useLocation()
-  const { mode, apiKey, tenant } = useSettings()
+  const { mode, apiKey, tenant, role } = useSettings()
   const tenantId = (tenant ?? '').trim().toLowerCase()
   const isAgricultura = tenantId === 'agricultura'
   const puedeConsultarApi = mode === 'api' && apiKey.trim().length > 0
@@ -284,6 +284,7 @@ export default function AuditarPage() {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [selectedAccionIdx, setSelectedAccionIdx] = useState<number | null>(null)
   const [selectedUsuario, setSelectedUsuario] = useState<string | null>(null)
+  const [restaurandoTxId, setRestaurandoTxId] = useState<string | null>(null)
 
   const buscarLineaTiempo = useCallback(async (idOverride?: string) => {
     const id = (idOverride ?? busquedaId).trim()
@@ -371,6 +372,27 @@ export default function AuditarPage() {
       setLoading(false)
     }
   }, [limite, desdeDia, hastaDia, puedeConsultarApi])
+
+  const restaurarRevision = useCallback(async (datoId: string, txId: string) => {
+    if (!datoId.trim() || !txId.trim()) return
+    const ok = window.confirm(
+      'Se creará un NUEVO bloque con los datos de esta revisión histórica. La cadena no se borra. ¿Deseas continuar?',
+    )
+    if (!ok) return
+
+    setRestaurandoTxId(txId)
+    setLineaError(null)
+    try {
+      await restaurarDatoRevision(datoId, txId)
+      await Promise.all([buscarLineaTiempo(datoId), load()])
+      setSelectedAccionIdx(null)
+      window.alert('Revisión restaurada correctamente como un nuevo bloque.')
+    } catch (e) {
+      setLineaError(describeApiError(e))
+    } finally {
+      setRestaurandoTxId(null)
+    }
+  }, [buscarLineaTiempo, load])
 
   const filas = useMemo(() => {
     let list = datos ? filasDesdeDatos(datos, tenantId) : []
@@ -697,6 +719,7 @@ export default function AuditarPage() {
           : clienteFilasLegibles(opActual?.cliente).map((r) => r.key)
 
         const selectedAutor = autorRolDisplayDesdeNotas(opActual?.cliente ?? undefined)
+        const esRevisionEliminada = Boolean(opActual?.isDelete)
 
         return (
           <div
@@ -812,6 +835,24 @@ export default function AuditarPage() {
                         <span className="text-ink-secondary font-mono block break-all">{selectedAcc.txId}</span>
                       </div>
                     </div>
+
+                    {isAgricultura && role === 'admin' ? (
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          type="button"
+                          className="admin-btn-primary !rounded-lg !px-3.5 !py-1.5 !text-xs disabled:opacity-50"
+                          disabled={restaurandoTxId === selectedAcc.txId || esRevisionEliminada}
+                          onClick={() => void restaurarRevision(lineaTiempo.clienteId, selectedAcc.txId)}
+                          title={
+                            esRevisionEliminada
+                              ? 'No se puede restaurar una revisión de eliminación'
+                              : 'Crear un nuevo bloque con los datos de esta revisión'
+                          }
+                        >
+                          {restaurandoTxId === selectedAcc.txId ? 'Restaurando…' : 'Restaurar esta revisión'}
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* Attributes Comparison Table */}

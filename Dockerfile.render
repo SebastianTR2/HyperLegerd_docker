@@ -1,0 +1,52 @@
+# --------------------------------------------------------------
+#  Dockerfile.render - Hyperledger Fabric + Render
+# --------------------------------------------------------------
+#  - Descarga los binarios oficiales de Hyperledger Fabric (v2.5.x)
+#  - Copia todo el codigo del proyecto dentro de la imagen
+#  - Expone los puertos tipicos de Fabric
+#  - Lanza un script de arranque que levanta la red
+# --------------------------------------------------------------
+
+# 1. Imagen base ligera
+FROM ubuntu:22.04
+
+# 2. Dependencias del sistema
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates curl gnupg git jq sudo \
+        libltdl7 libglib2.0-0 libstdc++6 && \
+    rm -rf /var/lib/apt/lists/*
+
+# 3. Versiones de Fabric
+ENV FABRIC_VERSION=2.5.4 \
+    FABRIC_CA_VERSION=1.5.7 \
+    PATH=$PATH:/opt/fabric/bin
+
+# 4. Descargar binarios oficiales
+RUN curl -sSL https://raw.githubusercontent.com/hyperledger/fabric/master/scripts/downloadFabric.sh \
+    | bash -s -- $FABRIC_VERSION $FABRIC_CA_VERSION && \
+    mv /root/fabric-samples /opt/fabric-samples && \
+    chmod -R +x /opt/fabric-samples/bin && \
+    ln -s /opt/fabric-samples/bin/* /usr/local/bin/
+
+# 5. Copiar todo el proyecto (incluye scripts, chaincode, config, etc.)
+COPY . /app
+WORKDIR /app
+
+# 6. Variables de entorno (pueden sobrescribirse desde Render)
+ENV CORE_PEER_LOCALMSPID=Org1MSP \
+    FABRIC_CFG_PATH=/app/config \
+    CHANNEL_NAME=clientes \
+    ORDERER_HOST=orderer.example.com \
+    ORDERER_PORT=7050 \
+    PEER0_HOST=peer0.org1.example.com \
+    PEER0_PORT=7051 \
+    HOST=0.0.0.0
+
+# 7. Puertos que Render abrira
+EXPOSE 7050 7051 7053 8080
+
+# 8. Entrypoint (Script que levanta la red)
+#    Asegurate de que scripts/start-fabric.sh exista y sea ejecutable
+CMD ["bash", "scripts/start-fabric.sh"]
